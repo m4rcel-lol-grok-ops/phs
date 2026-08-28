@@ -1,0 +1,58 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      - APP_NAME=${APP_NAME:-pornhub.singles}
+      - APP_ENV=${APP_ENV:-production}
+      - APP_DEBUG=${APP_DEBUG:-false}
+      - APP_URL=${APP_URL:-http://localhost:8080}
+      - APP_KEY=${APP_KEY:-change-this-to-a-random-32-char-string}
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-pornhub_singles}
+      - DB_USERNAME=${DB_USERNAME:-app}
+      - DB_PASSWORD=${DB_PASSWORD:-change-me-strong-password}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@pornhub.singles}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-change-me-admin-password}
+      - UPLOAD_MAX_SIZE=${UPLOAD_MAX_SIZE:-2097152}
+      - REGISTRATION_ENABLED=${REGISTRATION_ENABLED:-true}
+      - DISCOVERY_ENABLED=${DISCOVERY_ENABLED:-true}
+      - MAINTENANCE_MODE=${MAINTENANCE_MODE:-false}
+    volumes:
+      - uploads_data:/var/www/html/public/uploads
+      - storage_data:/var/www/html/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - phs_net
+
+  db:
+    image: mariadb:11
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-root-change-me}
+      - MYSQL_DATABASE=${DB_DATABASE:-pornhub_singles}
+      - MYSQL_USER=${DB_USERNAME:-app}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-change-me-strong-password}
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - phs_net
+
+volumes:
+  db_data:
+  uploads_data:
+  storage_data:
+
+networks:
+  phs_net:
+    driver: bridge

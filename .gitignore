@@ -1,0 +1,13 @@
+.env
+/vendor/
+/public/uploads/avatars/*
+/public/uploads/banners/*
+!/public/uploads/avatars/.gitkeep
+!/public/uploads/banners/.gitkeep
+/storage/logs/*
+/storage/cache/*
+!/storage/logs/.gitkeep
+!/storage/cache/.gitkeep
+!/storage/sessions/.gitkeep
+*.log
+.DS_Store
