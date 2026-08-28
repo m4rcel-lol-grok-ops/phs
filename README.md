@@ -41,7 +41,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-App will be available at `http://localhost:8080`.
+App will be available at `http://localhost:25169`.
 
 Default admin (created on first boot):
 
@@ -78,15 +78,28 @@ See `.env.example`. Important ones:
 5. Run `php database/migrate.php` and `php database/seed.php`
 6. Ensure `public/uploads` and `storage` are writable by the web user
 
-## Caddy Reverse Proxy Example
+## Caddy (system binary)
+
+Caddy is **not** included in Docker Compose. Use your installed `caddy` binary.
+
+1. Docker app listens on host port **25169** (set via `APP_PORT` in `.env`).
+2. Point Caddy at that port. Example `Caddyfile` is in the repo root:
 
 ```caddyfile
+# Development
+:80 {
+    reverse_proxy 127.0.0.1:25169
+}
+
+# Production
 pornhub.singles {
-    reverse_proxy localhost:8080
+    reverse_proxy 127.0.0.1:25169
 }
 ```
 
-The application respects `X-Forwarded-For` and `X-Forwarded-Proto`.
+3. Run: `caddy run --config Caddyfile` (or use your OS service).
+
+The app respects `X-Forwarded-For` and `X-Forwarded-Proto`. Edit the Caddyfile directly — it does not load `.env`.
 
 ## Content Policy
 
