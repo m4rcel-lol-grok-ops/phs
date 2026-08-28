@@ -72,14 +72,70 @@ class Link
     {
         $db = Database::getInstance();
         $stmt = $db->prepare('UPDATE links SET sort_order = ? WHERE id = ? AND profile_id = ?');
-        foreach ($order as $i => $id) {
-            $stmt->execute([$i, (int)$id, $profileId]);
+        $db->beginTransaction();
+        try {
+            foreach (array_values($order) as $i => $id) {
+                if (!is_numeric($id)) {
+                    continue;
+                }
+                $stmt->execute([$i, (int)$id, $profileId]);
+            }
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
         }
+    }
+
+    /**
+     * Swap a link with its neighbour. Backs the up/down buttons, which are the
+     * keyboard-accessible equivalent of dragging.
+     */
+    public static function move(int $id, int $profileId, string $direction): bool
+    {
+        $db = Database::getInstance();
+        $links = self::getByProfile($profileId, false);
+        $index = null;
+        foreach ($links as $i => $link) {
+            if ((int)$link['id'] === $id) {
+                $index = $i;
+                break;
+            }
+        }
+        if ($index === null) {
+            return false;
+        }
+        $target = $direction === 'up' ? $index - 1 : $index + 1;
+        if ($target < 0 || $target >= count($links)) {
+            return false;
+        }
+        [$links[$index], $links[$target]] = [$links[$target], $links[$index]];
+        self::reorder($profileId, array_column($links, 'id'));
+        return true;
+    }
+
+    /** Total clicks across a profile's links. */
+    public static function totalClicks(int $profileId): int
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT COALESCE(SUM(click_count), 0) FROM links WHERE profile_id = ?');
+        $stmt->execute([$profileId]);
+        return (int)$stmt->fetchColumn();
     }
 
     public static function recordClick(int $linkId, string $ip): void
     {
         $db = Database::getInstance();
+        // Ignore repeats from the same IP within a minute so a double-click or
+        // a back-and-click-again does not inflate the counter.
+        $recent = $db->prepare(
+            'SELECT id FROM link_clicks
+             WHERE link_id = ? AND clicker_ip = ? AND clicked_at > DATE_SUB(NOW(), INTERVAL 1 MINUTE) LIMIT 1'
+        );
+        $recent->execute([$linkId, $ip]);
+        if ($recent->fetch()) {
+            return;
+        }
         $db->prepare('INSERT INTO link_clicks (link_id, clicker_ip) VALUES (?, ?)')->execute([$linkId, $ip]);
         $db->prepare('UPDATE links SET click_count = click_count + 1 WHERE id = ?')->execute([$linkId]);
     }

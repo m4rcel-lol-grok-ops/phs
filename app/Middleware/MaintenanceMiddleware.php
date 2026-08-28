@@ -7,14 +7,24 @@ class MaintenanceMiddleware
 {
     public function handle(): void
     {
-        if (env('MAINTENANCE_MODE', false) && !is_admin()) {
-            $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-            $allowed = ['/login', '/admin'];
-            if (!in_array($uri, $allowed, true) && !str_starts_with($uri, '/admin')) {
-                http_response_code(503);
-                require BASE_PATH . '/resources/views/errors/maintenance.php';
-                exit;
-            }
+        if (!setting_bool('maintenance_mode', false)) {
+            return;
         }
+
+        $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+
+        // Admins need to reach the panel to turn maintenance back off, and
+        // everyone needs the login page and the stylesheet to get there.
+        if (str_starts_with($uri, '/admin') || $uri === '/login' || $uri === '/logout' || $uri === '/health') {
+            return;
+        }
+        if (is_admin()) {
+            return;
+        }
+
+        http_response_code(503);
+        header('Retry-After: 3600');
+        require BASE_PATH . '/resources/views/errors/maintenance.php';
+        exit;
     }
 }

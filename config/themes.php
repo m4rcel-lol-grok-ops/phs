@@ -1,0 +1,96 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Profile themes.
+ *
+ * Each theme supplies the palette a profile starts from. Per-profile colour
+ * overrides are layered on top at render time, so a theme is a preset rather
+ * than a lock. `swatch` is only used for the picker in the dashboard.
+ */
+return [
+    'hub' => [
+        'label' => 'Hub',
+        'blurb' => 'Black and orange. The classic.',
+        'swatch' => 'linear-gradient(135deg,#0a0a0a 0%,#141414 45%,#ff9900 100%)',
+        'bg' => '#0a0a0a',
+        'bg_gradient' => 'radial-gradient(1200px 600px at 50% -10%, #2a1600 0%, #0a0a0a 60%)',
+        'card' => '#161616',
+        'accent' => '#ff9900',
+        'text' => '#f5f5f5',
+        'button' => '#ff9900',
+        'font' => 'system',
+        'radius' => '24px',
+        'card_border' => 'rgba(255,255,255,0.08)',
+    ],
+    'midnight' => [
+        'label' => 'Midnight',
+        'blurb' => 'Deep blue, quiet, a little moody.',
+        'swatch' => 'linear-gradient(135deg,#05060f 0%,#131a3a 55%,#6c8cff 100%)',
+        'bg' => '#05060f',
+        'bg_gradient' => 'radial-gradient(1000px 700px at 70% 0%, #1b2350 0%, #05060f 65%)',
+        'card' => '#101529',
+        'accent' => '#7c9cff',
+        'text' => '#e6ebff',
+        'button' => '#7c9cff',
+        'font' => 'system',
+        'radius' => '22px',
+        'card_border' => 'rgba(124,156,255,0.18)',
+    ],
+    'terminal' => [
+        'label' => 'Terminal',
+        'blurb' => 'Green on black. Monospace everything.',
+        'swatch' => 'linear-gradient(135deg,#000 0%,#031a03 55%,#00ff66 100%)',
+        'bg' => '#000000',
+        'bg_gradient' => 'linear-gradient(180deg,#000000 0%,#021002 100%)',
+        'card' => '#050d05',
+        'accent' => '#00ff66',
+        'text' => '#c9ffd9',
+        'button' => '#00ff66',
+        'font' => 'mono',
+        'radius' => '6px',
+        'card_border' => 'rgba(0,255,102,0.28)',
+    ],
+    'corporate' => [
+        'label' => 'Corporate',
+        'blurb' => 'Clean, light, suspiciously professional.',
+        'swatch' => 'linear-gradient(135deg,#ffffff 0%,#eef1f6 55%,#2563eb 100%)',
+        'bg' => '#f4f6fa',
+        'bg_gradient' => 'linear-gradient(180deg,#ffffff 0%,#eef1f6 100%)',
+        'card' => '#ffffff',
+        'accent' => '#2563eb',
+        'text' => '#111827',
+        'button' => '#2563eb',
+        'font' => 'system',
+        'radius' => '14px',
+        'card_border' => 'rgba(17,24,39,0.10)',
+    ],
+    'degenerate' => [
+        'label' => 'Degenerate',
+        'blurb' => 'Loud gradients. No regrets.',
+        'swatch' => 'linear-gradient(135deg,#ff006e 0%,#8338ec 50%,#ff9900 100%)',
+        'bg' => '#12001f',
+        'bg_gradient' => 'linear-gradient(135deg,#2a0033 0%,#12001f 40%,#33001a 100%)',
+        'card' => '#1e0630',
+        'accent' => '#ff2d95',
+        'text' => '#ffe9f7',
+        'button' => '#ff2d95',
+        'font' => 'rounded',
+        'radius' => '28px',
+        'card_border' => 'rgba(255,45,149,0.30)',
+    ],
+    'minimal' => [
+        'label' => 'Minimal',
+        'blurb' => 'Grayscale. Nothing to prove.',
+        'swatch' => 'linear-gradient(135deg,#111 0%,#555 55%,#eee 100%)',
+        'bg' => '#111111',
+        'bg_gradient' => 'linear-gradient(180deg,#151515 0%,#0d0d0d 100%)',
+        'card' => '#1b1b1b',
+        'accent' => '#e8e8e8',
+        'text' => '#ededed',
+        'button' => '#e8e8e8',
+        'font' => 'system',
+        'radius' => '10px',
+        'card_border' => 'rgba(255,255,255,0.10)',
+    ],
+];

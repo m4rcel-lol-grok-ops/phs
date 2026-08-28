@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Models\User;
-use App\Core\Database;
 
 class AuthController
 {
@@ -13,7 +12,7 @@ class AuthController
         if (is_logged_in()) {
             redirect('/dashboard');
         }
-        view('auth.login', ['title' => 'Login — pornhub.singles']);
+        view('auth.login', ['title' => 'Log in — ' . site_name()]);
     }
 
     public function login(): void
@@ -26,18 +25,32 @@ class AuthController
             exit;
         }
 
-        $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
+        // The field accepts either identifier: the docs hand out the admin
+        // *username*, so email-only login looked like "wrong password".
+        $identifier = trim($_POST['identifier'] ?? $_POST['email'] ?? '');
+        $password = (string)($_POST['password'] ?? '');
 
-        $_SESSION['_old'] = ['email' => $email];
+        remember_old(['identifier' => $identifier]);
 
-        if (!$email || !$password) {
-            flash('error', 'Email and password are required.');
+        if ($identifier === '' || $password === '') {
+            flash('error', 'Enter your username or email and your password.');
             redirect('/login');
         }
 
-        $user = User::findByEmail($email);
+        $user = str_contains($identifier, '@')
+            ? User::findByEmail($identifier)
+            : User::findByUsername($identifier);
+
+        // Fall back to the other column so an email-shaped username (or a
+        // username typed into a browser-autofilled email field) still works.
         if (!$user) {
+            $user = User::findByUsernameOrEmail($identifier);
+        }
+
+        if (!$user) {
+            // Equalise timing with the password_verify path below so this
+            // endpoint does not leak which accounts exist.
+            password_verify($password, '$2y$10$QQD9GapoauwyF94OP/5WSueqBgybE9dHu9ZhQWMCv.MDb6Pj1jHgS');
             flash('error', 'Invalid credentials.');
             redirect('/login');
         }
@@ -47,8 +60,8 @@ class AuthController
             redirect('/login');
         }
 
-        if ($user['locked_until'] && strtotime($user['locked_until']) > time()) {
-            flash('error', 'Account temporarily locked. Try again later.');
+        if ($user['locked_until'] && strtotime((string)$user['locked_until']) > time()) {
+            flash('error', 'Too many failed attempts. Try again in a few minutes.');
             redirect('/login');
         }
 
@@ -61,10 +74,13 @@ class AuthController
             redirect('/login');
         }
 
+        // Upgrade legacy hashes transparently on successful login.
+        if (password_needs_rehash($user['password_hash'], PASSWORD_DEFAULT)) {
+            User::updatePassword((int)$user['id'], $password);
+        }
+
         User::resetLoginAttempts((int)$user['id']);
-        session_regenerate_id(true);
-        $_SESSION['user_id'] = (int)$user['id'];
-        unset($_SESSION['_old']);
+        $this->startSession((int)$user['id']);
         flash('success', 'Welcome back, internet celebrity.');
         redirect('/dashboard');
     }
@@ -74,19 +90,19 @@ class AuthController
         if (is_logged_in()) {
             redirect('/dashboard');
         }
-        if (!env('REGISTRATION_ENABLED', true)) {
-            flash('error', 'Registration is currently disabled.');
+        if (!setting_bool('registration_enabled', true)) {
+            flash('error', 'Registration is currently closed.');
             redirect('/');
         }
-        view('auth.register', ['title' => 'Create Profile — pornhub.singles']);
+        view('auth.register', ['title' => 'Create your profile — ' . site_name()]);
     }
 
     public function register(): void
     {
         (new \App\Middleware\CsrfMiddleware())->handle();
 
-        if (!env('REGISTRATION_ENABLED', true)) {
-            flash('error', 'Registration is currently disabled.');
+        if (!setting_bool('registration_enabled', true)) {
+            flash('error', 'Registration is currently closed.');
             redirect('/');
         }
 
@@ -98,21 +114,26 @@ class AuthController
 
         $username = trim($_POST['username'] ?? '');
         $email = trim($_POST['email'] ?? '');
-        $password = $_POST['password'] ?? '';
-        $passwordConfirm = $_POST['password_confirm'] ?? '';
+        $password = (string)($_POST['password'] ?? '');
+        $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
 
-        $_SESSION['_old'] = compact('username', 'email');
+        remember_old(compact('username', 'email'));
 
         $errors = [];
         if (!preg_match('/^[a-zA-Z0-9_]{3,32}$/', $username)) {
-            $errors[] = 'Username must be 3-32 characters (letters, numbers, underscores).';
-        }
-        $reserved = require BASE_PATH . '/config/reserved.php';
-        if (in_array(strtolower($username), $reserved, true)) {
-            $errors[] = 'This username is reserved.';
+            $errors[] = 'Username must be 3–32 characters (letters, numbers, underscores).';
+        } else {
+            $reserved = require BASE_PATH . '/config/reserved.php';
+            if (in_array(strtolower($username), $reserved, true)) {
+                $errors[] = 'That username is reserved.';
+            } elseif (User::findByUsername($username)) {
+                $errors[] = 'That username is already taken.';
+            }
         }
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'Valid email is required.';
+            $errors[] = 'Enter a valid email address.';
+        } elseif (User::findByEmail($email)) {
+            $errors[] = 'That email is already registered.';
         }
         if (strlen($password) < 8) {
             $errors[] = 'Password must be at least 8 characters.';
@@ -121,34 +142,54 @@ class AuthController
             $errors[] = 'Passwords do not match.';
         }
 
-        if (User::findByUsername($username)) {
-            $errors[] = 'Username already taken.';
-        }
-        if (User::findByEmail($email)) {
-            $errors[] = 'Email already registered.';
-        }
-
         if ($errors) {
             flash('error', implode(' ', $errors));
             redirect('/register');
         }
 
         $id = User::create($username, $email, $password);
-        session_regenerate_id(true);
-        $_SESSION['user_id'] = $id;
-        unset($_SESSION['_old']);
+        $this->startSession($id);
         flash('success', 'Welcome! Your unnecessarily dramatic profile is ready.');
         redirect('/dashboard');
     }
 
     public function logout(): void
     {
+        // Only a POST (with CSRF) may end a session, so a stray <img> or link
+        // on another site cannot log people out.
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            redirect(is_logged_in() ? '/dashboard' : '/');
+        }
+        (new \App\Middleware\CsrfMiddleware())->handle();
+
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'],
+                'domain' => $params['domain'],
+                'secure' => $params['secure'],
+                'httponly' => $params['httponly'],
+                'samesite' => $params['samesite'] ?? 'Lax',
+            ]);
         }
         session_destroy();
+
+        // Start a fresh session purely to carry the goodbye message.
+        session_start();
+        session_regenerate_id(true);
+        flash('success', 'Logged out. The internet will cope.');
         redirect('/');
+    }
+
+    /** Regenerate the id on privilege change and seed the new session. */
+    private function startSession(int $userId): void
+    {
+        session_regenerate_id(true);
+        $_SESSION['user_id'] = $userId;
+        $_SESSION['_last_seen'] = time();
+        unset($_SESSION['_old'], $_SESSION['csrf_token']);
+        csrf_token();
     }
 }

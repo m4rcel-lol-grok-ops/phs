@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     text_color VARCHAR(7) NOT NULL DEFAULT '#ffffff',
     button_color VARCHAR(7) NOT NULL DEFAULT '#ff9900',
     font_family VARCHAR(64) NOT NULL DEFAULT 'system',
+    use_custom_colors TINYINT(1) NOT NULL DEFAULT 0,
     effects_enabled TINYINT(1) NOT NULL DEFAULT 0,
     effect_type VARCHAR(32) NULL,
     music_url VARCHAR(512) NULL,

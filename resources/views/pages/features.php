@@ -1,24 +1,30 @@
 <?php ob_start(); ?>
 <section class="section">
     <div class="container">
-        <h1 class="section-title">Features</h1>
-        <p class="section-sub">Everything you need for an extremely important internet presence.</p>
-        <div class="features-grid">
-            <div class="feature-card"><div class="icon">👤</div><h3>Custom Profiles</h3><p>Avatar, banner, bio, pronouns, location, and verification badge support.</p></div>
-            <div class="feature-card"><div class="icon">🔗</div><h3>Bio Links</h3><p>Unlimited links with titles, descriptions, emojis, icons, and click tracking.</p></div>
-            <div class="feature-card"><div class="icon">🎨</div><h3>Themes</h3><p>Hub, Midnight, Terminal, Corporate, Degenerate, Minimal — then customize further.</p></div>
-            <div class="feature-card"><div class="icon">🌈</div><h3>Colors & Fonts</h3><p>Background, cards, accents, text, buttons. Built-in safe font choices.</p></div>
-            <div class="feature-card"><div class="icon">🖼️</div><h3>Backgrounds</h3><p>Solid, gradient, uploaded image, or remote URL.</p></div>
-            <div class="feature-card"><div class="icon">🎵</div><h3>Music Player</h3><p>Optional HTML5 audio with title, artist, play/pause. No autoplay.</p></div>
-            <div class="feature-card"><div class="icon">✨</div><h3>Effects</h3><p>Particles, animated gradients, glow, snow, CRT, scanlines — off by default.</p></div>
-            <div class="feature-card"><div class="icon">📈</div><h3>Statistics</h3><p>Profile views, link clicks, join date. Dashboard for owners only.</p></div>
-            <div class="feature-card"><div class="icon">🔍</div><h3>Discover</h3><p>Browse public profiles. Search, sort by popular/new/random. Opt out anytime.</p></div>
-            <div class="feature-card"><div class="icon">🛡️</div><h3>Moderation</h3><p>Report system, admin panel, content policy. No explicit content allowed.</p></div>
-            <div class="feature-card"><div class="icon">🐳</div><h3>Docker Ready</h3><p>One command to start. Works behind Caddy or any reverse proxy.</p></div>
-            <div class="feature-card"><div class="icon">📱</div><h3>Responsive</h3><p>Looks good on phones. Touch-friendly. Accessible focus states.</p></div>
+        <div class="section-head">
+            <span class="eyebrow">Everything included</span>
+            <h1 class="section-title">Features</h1>
+            <p class="section-sub">Everything you need for an extremely important internet presence.</p>
         </div>
+
+        <div class="features-grid">
+            <div class="feature-card"><div class="icon" aria-hidden="true">👤</div><h3>Custom profiles</h3><p>Avatar, banner, bio, pronouns, location, website, and an optional verification badge.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🔗</div><h3>Bio links</h3><p>Unlimited links with titles, descriptions and emoji. Drag to reorder, hide without deleting.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🎨</div><h3>Six themes</h3><p>Hub, Midnight, Terminal, Corporate, Degenerate, Minimal — each a full palette you can then override.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🌈</div><h3>Colours &amp; fonts</h3><p>Background, card, accent, text and button colours, plus four safe font stacks.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🖼️</div><h3>Backgrounds</h3><p>Theme default, custom gradient, an uploaded image, or a remote URL.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🎵</div><h3>Music player</h3><p>Optional HTML5 audio with title and artist. No autoplay, ever.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">✨</div><h3>Effects</h3><p>Particles, animated gradient, glow, snow, CRT, scanlines. Off by default and motion-safe.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">📈</div><h3>Statistics</h3><p>Profile views and link clicks with a 14-day chart. Deduplicated, and visible only to you.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🔍</div><h3>Discover</h3><p>Browse public profiles by popular, new or random. Opt out any time without losing your link.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🛡️</div><h3>Moderation</h3><p>Report system, admin panel with an audit log, and a content policy that bans explicit material.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">🐳</div><h3>Docker ready</h3><p>One command to start. Works behind Caddy, nginx, or any reverse proxy.</p></div>
+            <div class="feature-card"><div class="icon" aria-hidden="true">📱</div><h3>Accessible &amp; responsive</h3><p>Keyboard navigable, screen-reader labelled, and respectful of reduced-motion preferences.</p></div>
+        </div>
+
+        <?php if (!is_logged_in() && setting_bool('registration_enabled', true)): ?>
+            <p class="text-center mt-4"><a href="/register" class="btn btn-primary btn-lg">Create your profile</a></p>
+        <?php endif; ?>
     </div>
 </section>
-<?php
-$content = ob_get_clean();
-require BASE_PATH . '/resources/views/layouts/main.php';
+<?php $content = ob_get_clean(); require BASE_PATH . '/resources/views/layouts/main.php';

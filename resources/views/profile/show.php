@@ -1,148 +1,217 @@
 <?php
-$bgStyle = '';
-$cardBg = $profile['card_color'] ?? '#1a1a1a';
-$textColor = $profile['text_color'] ?? '#ffffff';
-$accent = $profile['accent_color'] ?? '#ff9900';
-$btnColor = $profile['button_color'] ?? '#ff9900';
+/**
+ * Public profile page.
+ *
+ * Every colour/background value comes from Theme::resolve(), which has already
+ * run the css_* sanitizers. They are emitted as custom property values only —
+ * never as selectors or property names.
+ *
+ * @var array $profile
+ * @var array $links
+ * @var array $theme
+ * @var bool  $isOwner
+ */
+use App\Core\Theme;
 
-switch ($profile['bg_type'] ?? 'solid') {
-    case 'gradient':
-        $bgStyle = 'background: ' . ($profile['bg_gradient'] ?: 'linear-gradient(135deg, #0a0a0a, #1a0a00)') . ';';
-        break;
-    case 'image':
-        if ($profile['bg_image']) {
-            $bgStyle = 'background: url(/uploads/banners/' . e($profile['bg_image']) . ') center/cover no-repeat fixed;';
-        }
-        break;
-    case 'url':
-        if ($profile['bg_url']) {
-            $bgStyle = 'background: url(' . e($profile['bg_url']) . ') center/cover no-repeat fixed;';
-        }
-        break;
-    default:
-        $bgStyle = 'background: ' . e($profile['bg_color'] ?? '#0a0a0a') . ';';
-}
+$colors = $theme['colors'];
+$buttonFg = Theme::contrast($colors['button']);
+$accentSoft = Theme::rgba($colors['accent'], 0.14);
+$surface = Theme::isLight($colors['card'])
+    ? 'rgba(0,0,0,0.035)'
+    : 'rgba(255,255,255,0.04)';
 
-$fontMap = [
-    'mono' => 'var(--font-mono)',
-    'serif' => 'Georgia, "Times New Roman", serif',
-    'rounded' => '"Segoe UI Rounded", "SF Pro Rounded", system-ui, sans-serif',
-    'system' => 'var(--font)',
-];
-$font = $fontMap[$profile['font_family'] ?? 'system'] ?? $fontMap['system'];
+$displayName = $profile['display_name'] ?: $profile['username'];
+$avatar = upload_filename($profile['avatar'] ?? null);
+$banner = upload_filename($profile['banner'] ?? null);
+$website = $profile['website'] ?? null;
+$effect = $theme['effect'];
+$flashHtml = flash_alerts();
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($title) ?></title>
     <meta name="description" content="<?= e($description) ?>">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
-    <meta property="og:title" content="<?= e($title) ?>">
+    <?php if (!$profile['is_public']): ?>
+        <meta name="robots" content="noindex, nofollow">
+    <?php endif; ?>
+
+    <meta property="og:title" content="<?= e($displayName) ?> (@<?= e($profile['username']) ?>)">
     <meta property="og:description" content="<?= e($description) ?>">
+    <meta property="og:type" content="profile">
+    <meta property="og:url" content="<?= e(url($profile['username'])) ?>">
     <?php if (!empty($og_image)): ?><meta property="og:image" content="<?= e($og_image) ?>"><?php endif; ?>
     <meta name="twitter:card" content="summary">
-    <link rel="stylesheet" href="<?= asset('css/app.css') ?>">
+
+    <link rel="stylesheet" href="<?= e(asset('css/profile.css')) ?>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+
     <style>
-        body { <?= $bgStyle ?> color: <?= e($textColor) ?>; font-family: <?= $font ?>; }
-        .profile-card { --card-bg: <?= e($cardBg) ?>; background: <?= e($cardBg) ?>; }
-        .link-card:hover { border-color: <?= e($accent) ?> !important; background: color-mix(in srgb, <?= e($accent) ?> 12%, transparent) !important; }
-        .verified-badge { background: <?= e($accent) ?>; }
-        .music-player button { background: <?= e($btnColor) ?>; }
-        a { color: <?= e($accent) ?>; }
+        .profile-body {
+            --p-bg: <?= $colors['bg'] ?>;
+            --p-card: <?= $colors['card'] ?>;
+            --p-accent: <?= $colors['accent'] ?>;
+            --p-text: <?= $colors['text'] ?>;
+            --p-button: <?= $colors['button'] ?>;
+            --p-button-fg: <?= $buttonFg ?>;
+            --p-radius: <?= $theme['radius'] ?>;
+            --p-border: <?= $theme['border'] ?>;
+            --p-surface: <?= $surface ?>;
+            --p-accent-soft: <?= $accentSoft ?>;
+            background: <?= $theme['background'] ?>;
+            font-family: <?= $theme['font'] ?>;
+        }
     </style>
 </head>
-<body>
+<body class="profile-body theme-<?= e($theme['theme']) ?>">
+
+<?php if ($effect !== null): ?>
+    <div class="fx-layer fx-<?= e($effect) ?>" aria-hidden="true"
+         <?= in_array($effect, ['particles', 'snow'], true) ? 'data-fx="' . e($effect) . '"' : '' ?>></div>
+<?php endif; ?>
+
 <div class="profile-page">
-    <div class="profile-card">
-        <?php if ($profile['banner']): ?>
-            <div class="profile-banner" style="background-image:url(/uploads/banners/<?= e($profile['banner']) ?>)"></div>
-        <?php else: ?>
-            <div class="profile-banner" style="background:linear-gradient(135deg,<?= e($cardBg) ?>,<?= e($accent) ?>33)"></div>
-        <?php endif; ?>
 
-        <div class="profile-header">
-            <?php if ($profile['avatar']): ?>
-                <img src="/uploads/avatars/<?= e($profile['avatar']) ?>" alt="<?= e($profile['display_name'] ?: $profile['username']) ?>" class="profile-avatar" width="96" height="96">
+    <?php if ($flashHtml !== ''): ?>
+        <div class="profile-flash"><?= $flashHtml ?></div>
+    <?php endif; ?>
+
+    <?php if ($isOwner): ?>
+        <div class="owner-bar">
+            <span>
+                <?= $profile['is_public']
+                    ? 'This is your public profile.'
+                    : 'Your profile is private — only you can see this page.' ?>
+            </span>
+            <a href="/dashboard/appearance">Edit appearance →</a>
+        </div>
+    <?php endif; ?>
+
+    <article class="profile-card">
+        <div class="profile-banner"<?= $banner
+            ? ' style="background-image:url(\'/uploads/banners/' . e($banner) . '\')"'
+            : ' style="background:linear-gradient(135deg,' . $colors['card'] . ',' . $accentSoft . ')"' ?>></div>
+
+        <header class="profile-header">
+            <?php if ($avatar !== null): ?>
+                <img src="/uploads/avatars/<?= e($avatar) ?>" alt="<?= e($displayName) ?>"
+                     class="profile-avatar" width="104" height="104" loading="eager" decoding="async">
             <?php else: ?>
-                <div class="profile-avatar-placeholder"><?= e(mb_strtoupper(mb_substr($profile['display_name'] ?: $profile['username'], 0, 1))) ?></div>
+                <div class="profile-avatar-ph" aria-hidden="true"><?= e(mb_strtoupper(mb_substr($displayName, 0, 1))) ?></div>
             <?php endif; ?>
 
-            <div class="profile-name">
-                <?= e($profile['display_name'] ?: $profile['username']) ?>
-                <?php if ($profile['is_verified']): ?><span class="verified-badge" title="Verified">✓</span><?php endif; ?>
-            </div>
+            <h1 class="profile-name">
+                <?= e($displayName) ?>
+                <?php if ($profile['is_verified']): ?>
+                    <span class="verified-badge" title="Verified" aria-label="Verified account">✓</span>
+                <?php endif; ?>
+            </h1>
             <div class="profile-username">@<?= e($profile['username']) ?></div>
-            <?php if ($profile['pronouns']): ?>
-                <div style="font-size:0.85rem;opacity:0.7;margin-bottom:0.25rem"><?= e($profile['pronouns']) ?></div>
-            <?php endif; ?>
-            <?php if ($profile['bio']): ?>
-                <div class="profile-bio"><?= e($profile['bio']) ?></div>
-            <?php endif; ?>
-            <div class="profile-meta">
-                <?php if ($profile['location']): ?><span>📍 <?= e($profile['location']) ?></span><?php endif; ?>
-                <span>Joined <?= date('M Y', strtotime($profile['user_created_at'])) ?></span>
-                <span><?= format_number((int)$profile['profile_views']) ?> views</span>
-            </div>
-        </div>
 
-        <?php if ($profile['music_url']): ?>
-        <div class="music-player">
-            <button type="button" id="music-play" aria-label="Play">▶</button>
-            <div class="music-info">
-                <div class="music-title"><?= e($profile['music_title'] ?: 'Track') ?></div>
-                <?php if ($profile['music_artist']): ?><div class="music-artist"><?= e($profile['music_artist']) ?></div><?php endif; ?>
+            <?php if (!empty($profile['pronouns'])): ?>
+                <div class="profile-pronouns"><?= e($profile['pronouns']) ?></div>
+            <?php endif; ?>
+
+            <?php if (!empty($profile['bio'])): ?>
+                <p class="profile-bio"><?= e($profile['bio']) ?></p>
+            <?php endif; ?>
+
+            <div class="profile-meta">
+                <?php if (!empty($profile['location'])): ?>
+                    <span>📍 <?= e($profile['location']) ?></span>
+                <?php endif; ?>
+                <?php if (!empty($website)): ?>
+                    <span>🔗 <a href="<?= e($website) ?>" rel="nofollow noopener noreferrer" target="_blank"><?= e(link_host($website)) ?></a></span>
+                <?php endif; ?>
+                <span>Joined <?= e(date('M Y', strtotime((string)$profile['user_created_at']) ?: time())) ?></span>
             </div>
-            <audio id="profile-audio" src="<?= e($profile['music_url']) ?>" preload="none"></audio>
-        </div>
+        </header>
+
+        <?php if (!empty($profile['music_url'])): ?>
+            <div class="music-player">
+                <button type="button" id="music-play" aria-label="Play track">▶</button>
+                <div class="music-info">
+                    <div class="music-title"><?= e($profile['music_title'] ?: 'Untitled track') ?></div>
+                    <?php if (!empty($profile['music_artist'])): ?>
+                        <div class="music-artist"><?= e($profile['music_artist']) ?></div>
+                    <?php endif; ?>
+                </div>
+                <audio id="profile-audio" src="<?= e($profile['music_url']) ?>" preload="none"></audio>
+            </div>
         <?php endif; ?>
 
         <div class="profile-links">
             <?php if (empty($links)): ?>
-                <p style="text-align:center;opacity:0.5;padding:1rem">Nothing here yet. Embarrassing.</p>
+                <p class="profile-empty">No links yet. Embarrassing.</p>
             <?php else: ?>
                 <?php foreach ($links as $link): ?>
-                    <a href="/click/<?= (int)$link['id'] ?>" class="link-card" rel="noopener noreferrer" target="_blank">
-                        <?php if ($link['emoji']): ?><span class="link-emoji"><?= e($link['emoji']) ?></span><?php endif; ?>
-                        <div class="link-info">
-                            <div class="link-title"><?= e($link['title']) ?></div>
-                            <?php if ($link['description']): ?><div class="link-desc"><?= e($link['description']) ?></div><?php endif; ?>
-                        </div>
+                    <a href="/click/<?= (int)$link['id'] ?>" class="link-card"
+                       target="_blank" rel="noopener noreferrer nofollow">
+                        <?php if (!empty($link['emoji'])): ?>
+                            <span class="link-emoji" aria-hidden="true"><?= e($link['emoji']) ?></span>
+                        <?php endif; ?>
+                        <span class="link-info">
+                            <span class="link-title"><?= e($link['title']) ?></span>
+                            <?php if (!empty($link['description'])): ?>
+                                <span class="link-desc"><?= e($link['description']) ?></span>
+                            <?php endif; ?>
+                        </span>
+                        <span class="link-arrow" aria-hidden="true">↗</span>
                     </a>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
 
-        <div class="profile-footer-stats">
-            <?= format_number((int)$profile['profile_views']) ?> totally real visitors · <?= count($links) ?> links
-        </div>
-    </div>
+        <footer class="profile-footer-stats">
+            <?= e(format_number((int)$profile['profile_views'])) ?> totally real visitors
+            · <?= count($links) ?> link<?= count($links) === 1 ? '' : 's' ?>
+        </footer>
+    </article>
 
-    <div class="profile-report">
-        <button type="button" id="report-btn">Report</button>
-        · <a href="/" style="color:inherit;opacity:0.6">pornhub.singles</a>
+    <div class="profile-actions">
+        <?php if (!$isOwner): ?>
+            <button type="button" id="report-btn">Report profile</button>
+            <span class="sep" aria-hidden="true">·</span>
+        <?php endif; ?>
+        <a href="/">Made with <?= e(site_name()) ?></a>
     </div>
 </div>
 
-<div id="report-modal" hidden style="position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:200;padding:1rem">
-    <div class="card" style="max-width:400px;width:100%">
-        <h3 style="margin-bottom:1rem">Report profile</h3>
+<?php if (!$isOwner): ?>
+<div class="modal" id="report-modal" hidden role="dialog" aria-modal="true" aria-labelledby="report-title">
+    <div class="modal-card">
+        <h3 id="report-title">Report profile</h3>
+        <p class="modal-sub">Reports go straight to the site moderators.</p>
         <form method="post" action="/report">
             <?= csrf_field() ?>
             <input type="hidden" name="user_id" value="<?= (int)$profile['user_id'] ?>">
-            <input type="hidden" name="type" value="profile">
-            <div class="form-group">
-                <label class="form-label" for="reason">Reason</label>
-                <textarea name="reason" id="reason" class="form-textarea" required minlength="10" placeholder="What's wrong?"></textarea>
-            </div>
-            <div style="display:flex;gap:0.75rem">
-                <button type="submit" class="btn btn-primary">Submit</button>
-                <button type="button" class="btn btn-secondary" id="report-close">Cancel</button>
+
+            <label for="report-type">What is the problem?</label>
+            <select name="type" id="report-type">
+                <option value="profile">The profile in general</option>
+                <option value="link">A link it points to</option>
+                <option value="avatar">The avatar image</option>
+                <option value="banner">The banner image</option>
+                <option value="biography">The biography text</option>
+                <option value="other">Something else</option>
+            </select>
+
+            <label for="report-reason">Tell us more</label>
+            <textarea name="reason" id="report-reason" required minlength="10" maxlength="2000"
+                      placeholder="Describe the problem in at least 10 characters."></textarea>
+
+            <div class="modal-actions">
+                <button type="submit" class="modal-submit">Submit report</button>
+                <button type="button" class="modal-cancel" id="report-close">Cancel</button>
             </div>
         </form>
     </div>
 </div>
-<script src="<?= asset('js/app.js') ?>"></script>
+<?php endif; ?>
+
+<script src="<?= e(asset('js/profile.js')) ?>" defer></script>
 </body>
 </html>

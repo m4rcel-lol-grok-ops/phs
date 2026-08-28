@@ -3,37 +3,39 @@ declare(strict_types=1);
 
 namespace App\Controllers;
 
-use App\Models\Profile;
-use App\Models\Link;
-use App\Models\User;
 use App\Core\Database;
+use App\Core\Theme;
+use App\Models\Link;
+use App\Models\Profile;
+use App\Models\User;
 
 class DashboardController
 {
+    private const UPLOAD_TYPES = [
+        'avatar' => ['dir' => 'avatars', 'redirect' => '/dashboard/profile'],
+        'banner' => ['dir' => 'banners', 'redirect' => '/dashboard/appearance'],
+    ];
+
     public function index(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
+        [$user, $profile] = $this->context();
         $links = Link::getByProfile((int)$profile['id'], false);
-        $totalClicks = array_sum(array_column($links, 'click_count'));
 
         view('dashboard.index', [
-            'title' => 'Dashboard — pornhub.singles',
+            'title' => 'Dashboard — ' . site_name(),
             'user' => $user,
             'profile' => $profile,
             'links' => $links,
-            'totalClicks' => $totalClicks,
+            'totalClicks' => array_sum(array_map(static fn($l) => (int)$l['click_count'], $links)),
+            'viewSeries' => Profile::viewsByDay((int)$profile['id'], 14),
         ]);
     }
 
     public function profile(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
+        [$user, $profile] = $this->context();
         view('dashboard.profile', [
-            'title' => 'Edit Profile — pornhub.singles',
+            'title' => 'Edit profile — ' . site_name(),
             'user' => $user,
             'profile' => $profile,
         ]);
@@ -41,261 +43,289 @@ class DashboardController
 
     public function updateProfile(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [$user] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
-        $data = [
-            'display_name' => trim($_POST['display_name'] ?? '') ?: null,
-            'bio' => trim($_POST['bio'] ?? '') ?: null,
-            'location' => trim($_POST['location'] ?? '') ?: null,
-            'website' => trim($_POST['website'] ?? '') ?: null,
-            'pronouns' => trim($_POST['pronouns'] ?? '') ?: null,
+
+        $website = trim($_POST['website'] ?? '');
+        if ($website !== '' && !preg_match('#^https?://#i', $website)) {
+            $website = 'https://' . $website;
+        }
+        if ($website !== '' && !filter_var($website, FILTER_VALIDATE_URL)) {
+            flash('error', 'That website address does not look like a valid URL.');
+            redirect('/dashboard/profile');
+        }
+
+        Profile::update((int)$user['id'], [
+            'display_name' => $this->nullable($_POST['display_name'] ?? '', 64),
+            'bio' => $this->nullable($_POST['bio'] ?? '', 500),
+            'location' => $this->nullable($_POST['location'] ?? '', 100),
+            'website' => $website !== '' ? mb_substr($website, 0, 255) : null,
+            'pronouns' => $this->nullable($_POST['pronouns'] ?? '', 32),
             'is_public' => isset($_POST['is_public']) ? 1 : 0,
             'show_in_discover' => isset($_POST['show_in_discover']) ? 1 : 0,
-        ];
-        // Sanitize bio length
-        if ($data['bio'] && mb_strlen($data['bio']) > 500) {
-            $data['bio'] = mb_substr($data['bio'], 0, 500);
-        }
-        Profile::update((int)$user['id'], $data);
+        ]);
+
         flash('success', 'Profile updated. Looking good (probably).');
         redirect('/dashboard/profile');
     }
 
     public function links(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
-        $links = Link::getByProfile((int)$profile['id'], false);
+        [$user, $profile] = $this->context();
         view('dashboard.links', [
-            'title' => 'Manage Links — pornhub.singles',
+            'title' => 'Manage links — ' . site_name(),
             'user' => $user,
             'profile' => $profile,
-            'links' => $links,
+            'links' => Link::getByProfile((int)$profile['id'], false),
         ]);
     }
 
     public function createLink(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [, $profile] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
+
         $title = trim($_POST['title'] ?? '');
-        $url = trim($_POST['url'] ?? '');
-        if (!$title || !$url) {
-            flash('error', 'Title and URL are required.');
+        $url = $this->normalizeUrl($_POST['url'] ?? '');
+
+        if ($title === '' || $url === null) {
+            flash('error', 'A link needs a title and a valid URL.');
             redirect('/dashboard/links');
         }
-        if (!preg_match('#^https?://#i', $url)) {
-            $url = 'https://' . $url;
-        }
+
         Link::create((int)$profile['id'], [
             'title' => mb_substr($title, 0, 100),
-            'url' => mb_substr($url, 0, 512),
-            'description' => mb_substr(trim($_POST['description'] ?? ''), 0, 255) ?: null,
-            'emoji' => mb_substr(trim($_POST['emoji'] ?? ''), 0, 16) ?: null,
-            'icon' => trim($_POST['icon'] ?? '') ?: null,
+            'url' => $url,
+            'description' => $this->nullable($_POST['description'] ?? '', 255),
+            'emoji' => $this->nullable($_POST['emoji'] ?? '', 16),
+            'icon' => $this->nullable($_POST['icon'] ?? '', 64),
         ]);
+
         flash('success', 'Link added. Your collection grows.');
         redirect('/dashboard/links');
     }
 
     public function updateLink(int $id): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [, $profile] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
-        $data = [
-            'title' => mb_substr(trim($_POST['title'] ?? ''), 0, 100),
-            'url' => mb_substr(trim($_POST['url'] ?? ''), 0, 512),
-            'description' => mb_substr(trim($_POST['description'] ?? ''), 0, 255) ?: null,
-            'emoji' => mb_substr(trim($_POST['emoji'] ?? ''), 0, 16) ?: null,
-            'is_enabled' => isset($_POST['is_enabled']) ? 1 : 0,
-        ];
-        if (!preg_match('#^https?://#i', $data['url'])) {
-            $data['url'] = 'https://' . $data['url'];
+
+        $title = trim($_POST['title'] ?? '');
+        $url = $this->normalizeUrl($_POST['url'] ?? '');
+        if ($title === '' || $url === null) {
+            flash('error', 'A link needs a title and a valid URL.');
+            redirect('/dashboard/links');
         }
-        Link::update($id, (int)$profile['id'], $data);
+
+        // Link::update scopes by profile_id, so one user cannot edit another's.
+        Link::update($id, (int)$profile['id'], [
+            'title' => mb_substr($title, 0, 100),
+            'url' => $url,
+            'description' => $this->nullable($_POST['description'] ?? '', 255),
+            'emoji' => $this->nullable($_POST['emoji'] ?? '', 16),
+            'is_enabled' => isset($_POST['is_enabled']) ? 1 : 0,
+        ]);
+
         flash('success', 'Link updated.');
         redirect('/dashboard/links');
     }
 
     public function deleteLink(int $id): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [, $profile] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
         Link::delete($id, (int)$profile['id']);
         flash('success', 'Link removed.');
         redirect('/dashboard/links');
     }
 
+    /** Keyboard/no-JS alternative to dragging. */
+    public function moveLink(int $id): void
+    {
+        [, $profile] = $this->context();
+        (new \App\Middleware\CsrfMiddleware())->handle();
+        $direction = ($_POST['direction'] ?? '') === 'up' ? 'up' : 'down';
+        Link::move($id, (int)$profile['id'], $direction);
+        redirect('/dashboard/links');
+    }
+
     public function reorderLinks(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [, $profile] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
-        $order = json_decode($_POST['order'] ?? '[]', true);
-        if (is_array($order)) {
-            Link::reorder((int)$profile['id'], $order);
+
+        $order = json_decode((string)($_POST['order'] ?? '[]'), true);
+        if (!is_array($order)) {
+            json_response(['ok' => false, 'error' => 'Invalid order payload.'], 422);
         }
+        Link::reorder((int)$profile['id'], $order);
         json_response(['ok' => true]);
     }
 
     public function appearance(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
-        $user = current_user();
-        $profile = Profile::findByUserId((int)$user['id']);
+        [$user, $profile] = $this->context();
         view('dashboard.appearance', [
-            'title' => 'Appearance — pornhub.singles',
+            'title' => 'Appearance — ' . site_name(),
             'user' => $user,
             'profile' => $profile,
+            'themes' => Theme::all(),
         ]);
     }
 
     public function updateAppearance(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [$user] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
-        $themes = ['hub', 'midnight', 'terminal', 'corporate', 'degenerate', 'minimal'];
-        $theme = $_POST['theme'] ?? 'hub';
-        if (!in_array($theme, $themes, true)) $theme = 'hub';
 
-        $hex = fn($v, $d) => preg_match('/^#[0-9a-fA-F]{6}$/', $v ?? '') ? $v : $d;
+        $theme = in_array($_POST['theme'] ?? '', Theme::keys(), true) ? $_POST['theme'] : 'hub';
+        $preset = Theme::get($theme);
+        $custom = isset($_POST['use_custom_colors']) ? 1 : 0;
 
-        $data = [
+        $musicUrl = trim($_POST['music_url'] ?? '');
+        if ($musicUrl !== '' && !filter_var($musicUrl, FILTER_VALIDATE_URL)) {
+            flash('error', 'The music URL is not a valid address.');
+            redirect('/dashboard/appearance');
+        }
+        if ($musicUrl !== '' && !preg_match('#^https?://#i', $musicUrl)) {
+            flash('error', 'The music URL must start with http:// or https://.');
+            redirect('/dashboard/appearance');
+        }
+
+        // Reject a gradient the renderer would silently drop, so the user is
+        // told rather than left wondering why nothing changed.
+        $gradientInput = trim($_POST['bg_gradient'] ?? '');
+        $gradient = css_gradient($gradientInput, '');
+        if ($gradientInput !== '' && $gradient === '') {
+            flash('error', 'That gradient contains characters we do not allow. Stick to values like: linear-gradient(135deg, #0a0a0a, #ff9900)');
+            redirect('/dashboard/appearance');
+        }
+
+        $bgUrlInput = trim($_POST['bg_url'] ?? '');
+        $bgUrl = css_url($bgUrlInput);
+        if ($bgUrlInput !== '' && $bgUrl === null) {
+            flash('error', 'The background image URL must be a plain https:// address with no spaces or quotes.');
+            redirect('/dashboard/appearance');
+        }
+
+        Profile::update((int)$user['id'], [
             'theme' => $theme,
-            'bg_type' => in_array($_POST['bg_type'] ?? '', ['solid','gradient','image','url'], true) ? $_POST['bg_type'] : 'solid',
-            'bg_color' => $hex($_POST['bg_color'] ?? null, '#0a0a0a'),
-            'bg_gradient' => trim($_POST['bg_gradient'] ?? '') ?: null,
-            'bg_url' => filter_var($_POST['bg_url'] ?? '', FILTER_VALIDATE_URL) ? $_POST['bg_url'] : null,
-            'card_color' => $hex($_POST['card_color'] ?? null, '#1a1a1a'),
-            'accent_color' => $hex($_POST['accent_color'] ?? null, '#ff9900'),
-            'text_color' => $hex($_POST['text_color'] ?? null, '#ffffff'),
-            'button_color' => $hex($_POST['button_color'] ?? null, '#ff9900'),
-            'font_family' => in_array($_POST['font_family'] ?? '', ['system','mono','serif','rounded'], true) ? $_POST['font_family'] : 'system',
+            'use_custom_colors' => $custom,
+            'bg_type' => in_array($_POST['bg_type'] ?? '', ['solid', 'gradient', 'image', 'url'], true)
+                ? $_POST['bg_type'] : 'solid',
+            'bg_color' => css_color($_POST['bg_color'] ?? null, $preset['bg']),
+            'bg_gradient' => $gradient !== '' ? $gradient : null,
+            'bg_url' => $bgUrl,
+            'card_color' => css_color($_POST['card_color'] ?? null, $preset['card']),
+            'accent_color' => css_color($_POST['accent_color'] ?? null, $preset['accent']),
+            'text_color' => css_color($_POST['text_color'] ?? null, $preset['text']),
+            'button_color' => css_color($_POST['button_color'] ?? null, $preset['button']),
+            'font_family' => array_key_exists($_POST['font_family'] ?? '', Theme::FONTS)
+                ? $_POST['font_family'] : $preset['font'],
             'effects_enabled' => isset($_POST['effects_enabled']) ? 1 : 0,
-            'effect_type' => in_array($_POST['effect_type'] ?? '', ['particles','gradient','glow','snow','crt','scanlines'], true) ? $_POST['effect_type'] : null,
-            'music_url' => filter_var($_POST['music_url'] ?? '', FILTER_VALIDATE_URL) ? $_POST['music_url'] : null,
-            'music_title' => mb_substr(trim($_POST['music_title'] ?? ''), 0, 128) ?: null,
-            'music_artist' => mb_substr(trim($_POST['music_artist'] ?? ''), 0, 128) ?: null,
-        ];
-        Profile::update((int)$user['id'], $data);
+            'effect_type' => in_array($_POST['effect_type'] ?? '', Theme::EFFECTS, true)
+                ? $_POST['effect_type'] : null,
+            'music_url' => $musicUrl !== '' ? mb_substr($musicUrl, 0, 512) : null,
+            'music_title' => $this->nullable($_POST['music_title'] ?? '', 128),
+            'music_artist' => $this->nullable($_POST['music_artist'] ?? '', 128),
+        ]);
+
         flash('success', 'Appearance saved. Orange intensity calibrated.');
         redirect('/dashboard/appearance');
     }
 
     public function uploadAvatar(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
         $this->handleUpload('avatar');
     }
 
     public function uploadBanner(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
         $this->handleUpload('banner');
     }
 
-    private function handleUpload(string $type): void
+    public function deleteAvatar(): void
     {
-        $user = current_user();
-        $field = $type === 'avatar' ? 'avatar' : 'banner';
-        if (empty($_FILES[$field]) || $_FILES[$field]['error'] !== UPLOAD_ERR_OK) {
-            flash('error', 'Upload failed.');
-            redirect('/dashboard/' . ($type === 'avatar' ? 'profile' : 'appearance'));
-        }
-        $file = $_FILES[$field];
-        $max = (int)env('UPLOAD_MAX_SIZE', 2097152);
-        if ($file['size'] > $max) {
-            flash('error', 'File too large. Max ' . round($max / 1024 / 1024, 1) . 'MB.');
-            redirect('/dashboard/profile');
-        }
-        $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file($file['tmp_name']);
-        $allowed = ['image/jpeg', 'image/png', 'image/webp'];
-        if (!in_array($mime, $allowed, true)) {
-            flash('error', 'Invalid file type. Use JPG, PNG, or WebP.');
-            redirect('/dashboard/profile');
-        }
-        $ext = match ($mime) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            default => 'jpg',
-        };
-        $dir = BASE_PATH . '/public/uploads/' . ($type === 'avatar' ? 'avatars' : 'banners');
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
-        if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
-            flash('error', 'Failed to save file.');
-            redirect('/dashboard/profile');
-        }
-        // Delete old
-        $profile = Profile::findByUserId((int)$user['id']);
-        $old = $profile[$type] ?? null;
-        if ($old && file_exists($dir . '/' . $old)) {
-            @unlink($dir . '/' . $old);
-        }
-        Profile::update((int)$user['id'], [$type => $filename]);
-        flash('success', ucfirst($type) . ' updated.');
-        redirect('/dashboard/' . ($type === 'avatar' ? 'profile' : 'appearance'));
+        $this->context();
+        (new \App\Middleware\CsrfMiddleware())->handle();
+        $this->removeImage('avatar');
+    }
+
+    public function deleteBanner(): void
+    {
+        $this->context();
+        (new \App\Middleware\CsrfMiddleware())->handle();
+        $this->removeImage('banner');
     }
 
     public function account(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
-        $user = current_user();
+        [$user, $profile] = $this->context();
         view('dashboard.account', [
-            'title' => 'Account — pornhub.singles',
+            'title' => 'Account — ' . site_name(),
             'user' => $user,
+            'profile' => $profile,
         ]);
     }
 
     public function updateAccount(): void
     {
-        (new \App\Middleware\AuthMiddleware())->handle();
+        [$user] = $this->context();
         (new \App\Middleware\CsrfMiddleware())->handle();
-        $user = current_user();
+
         $db = Database::getInstance();
         $action = $_POST['action'] ?? '';
 
         if ($action === 'password') {
-            $current = $_POST['current_password'] ?? '';
-            $new = $_POST['new_password'] ?? '';
-            $confirm = $_POST['new_password_confirm'] ?? '';
+            $current = (string)($_POST['current_password'] ?? '');
+            $new = (string)($_POST['new_password'] ?? '');
+            $confirm = (string)($_POST['new_password_confirm'] ?? '');
+
             $full = User::findById((int)$user['id']);
-            if (!password_verify($current, $full['password_hash'])) {
-                flash('error', 'Current password is incorrect.');
+            if (!$full || !password_verify($current, $full['password_hash'])) {
+                flash('error', 'Your current password is incorrect.');
                 redirect('/dashboard/account');
             }
-            if (strlen($new) < 8 || $new !== $confirm) {
-                flash('error', 'New password must be 8+ characters and match.');
+            if (strlen($new) < 8) {
+                flash('error', 'The new password must be at least 8 characters.');
                 redirect('/dashboard/account');
             }
+            if ($new !== $confirm) {
+                flash('error', 'The new passwords do not match.');
+                redirect('/dashboard/account');
+            }
+            if ($new === $current) {
+                flash('error', 'The new password must differ from the current one.');
+                redirect('/dashboard/account');
+            }
+
             User::updatePassword((int)$user['id'], $new);
+            // Changing a password should invalidate anyone else's stolen session.
+            session_regenerate_id(true);
             flash('success', 'Password changed.');
             redirect('/dashboard/account');
         }
 
         if ($action === 'email') {
             $email = trim($_POST['email'] ?? '');
+            $password = (string)($_POST['current_password'] ?? '');
+
+            $full = User::findById((int)$user['id']);
+            if (!$full || !password_verify($password, $full['password_hash'])) {
+                flash('error', 'Enter your current password to change your email.');
+                redirect('/dashboard/account');
+            }
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                flash('error', 'Invalid email.');
+                flash('error', 'That is not a valid email address.');
                 redirect('/dashboard/account');
             }
             $existing = User::findByEmail($email);
             if ($existing && (int)$existing['id'] !== (int)$user['id']) {
-                flash('error', 'Email already in use.');
+                flash('error', 'That email is already in use.');
                 redirect('/dashboard/account');
             }
             $db->prepare('UPDATE users SET email = ? WHERE id = ?')->execute([$email, $user['id']]);
@@ -304,18 +334,186 @@ class DashboardController
         }
 
         if ($action === 'delete') {
-            $confirm = $_POST['confirm_delete'] ?? '';
-            if ($confirm !== $user['username']) {
-                flash('error', 'Please type your username to confirm deletion.');
+            $confirm = trim($_POST['confirm_delete'] ?? '');
+            $password = (string)($_POST['current_password'] ?? '');
+
+            $full = User::findById((int)$user['id']);
+            if (!$full || !password_verify($password, $full['password_hash'])) {
+                flash('error', 'Enter your password to delete your account.');
                 redirect('/dashboard/account');
             }
+            if ($confirm !== $user['username']) {
+                flash('error', 'Type your username exactly to confirm deletion.');
+                redirect('/dashboard/account');
+            }
+            // The last admin deleting themselves would lock everyone out.
+            if ($user['role'] === 'admin' && $this->adminCount() <= 1) {
+                flash('error', 'You are the only administrator. Promote someone else first.');
+                redirect('/dashboard/account');
+            }
+
+            $this->deleteUploadsFor((int)$user['id']);
             $db->prepare('DELETE FROM users WHERE id = ?')->execute([$user['id']]);
+
+            // Destroy the old session first, then start a clean one to carry
+            // the goodbye message — otherwise the flash dies with the session.
             $_SESSION = [];
             session_destroy();
+            session_start();
+            session_regenerate_id(true);
             flash('success', 'Account deleted. Goodbye, internet.');
             redirect('/');
         }
 
         redirect('/dashboard/account');
+    }
+
+    // ---------------------------------------------------------------- helpers
+
+    /**
+     * Every dashboard action needs the user and their profile row, and must
+     * never run with a half-loaded session.
+     *
+     * @return array{0:array,1:array}
+     */
+    private function context(): array
+    {
+        $user = current_user();
+        if ($user === null) {
+            (new \App\Middleware\AuthMiddleware())->handle();
+        }
+        $profile = Profile::findOrCreateByUserId((int)$user['id'], (string)$user['username']);
+        return [$user, $profile];
+    }
+
+    private function nullable(string $value, int $max): ?string
+    {
+        $value = trim($value);
+        return $value === '' ? null : mb_substr($value, 0, $max);
+    }
+
+    private function normalizeUrl(string $url): ?string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return null;
+        }
+        if (!preg_match('#^https?://#i', $url)) {
+            $url = 'https://' . ltrim($url, '/');
+        }
+        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+        return mb_substr($url, 0, 512);
+    }
+
+    private function adminCount(): int
+    {
+        return (int)Database::getInstance()
+            ->query("SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_disabled = 0")
+            ->fetchColumn();
+    }
+
+    private function handleUpload(string $type): void
+    {
+        $user = current_user();
+        $config = self::UPLOAD_TYPES[$type];
+        $back = $config['redirect'];
+
+        $file = $_FILES[$type] ?? null;
+        if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            flash('error', $this->uploadErrorMessage($file['error'] ?? UPLOAD_ERR_NO_FILE));
+            redirect($back);
+        }
+
+        $max = setting_int('max_upload_size', 2097152);
+        if ((int)$file['size'] > $max) {
+            flash('error', 'That file is too large. Maximum is ' . round($max / 1024 / 1024, 1) . ' MB.');
+            redirect($back);
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+        $ext = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => null,
+        };
+        if ($ext === null) {
+            flash('error', 'Unsupported file type. Use JPG, PNG, or WebP.');
+            redirect($back);
+        }
+        // getimagesize is a second, independent check that this really decodes
+        // as an image and is not a payload wearing an image MIME type.
+        if (@getimagesize($file['tmp_name']) === false) {
+            flash('error', 'That file could not be read as an image.');
+            redirect($back);
+        }
+
+        $dir = BASE_PATH . '/public/uploads/' . $config['dir'];
+        if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+            flash('error', 'The upload directory is not writable. Contact the site operator.');
+            redirect($back);
+        }
+
+        $filename = bin2hex(random_bytes(16)) . '.' . $ext;
+        if (!move_uploaded_file($file['tmp_name'], $dir . '/' . $filename)) {
+            flash('error', 'Could not save the file.');
+            redirect($back);
+        }
+        @chmod($dir . '/' . $filename, 0644);
+
+        $profile = Profile::findByUserId((int)$user['id']);
+        $this->unlinkUpload($config['dir'], $profile[$type] ?? null);
+
+        Profile::update((int)$user['id'], [$type => $filename]);
+        flash('success', ucfirst($type) . ' updated.');
+        redirect($back);
+    }
+
+    private function removeImage(string $type): void
+    {
+        $user = current_user();
+        $config = self::UPLOAD_TYPES[$type];
+        $profile = Profile::findByUserId((int)$user['id']);
+        $this->unlinkUpload($config['dir'], $profile[$type] ?? null);
+        Profile::update((int)$user['id'], [$type => null]);
+        flash('success', ucfirst($type) . ' removed.');
+        redirect($config['redirect']);
+    }
+
+    /** Delete a stored upload, refusing anything that is not a generated name. */
+    private function unlinkUpload(string $dir, ?string $filename): void
+    {
+        $safe = upload_filename($filename);
+        if ($safe === null) {
+            return;
+        }
+        $path = BASE_PATH . '/public/uploads/' . $dir . '/' . $safe;
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
+    private function deleteUploadsFor(int $userId): void
+    {
+        $profile = Profile::findByUserId($userId);
+        if (!$profile) {
+            return;
+        }
+        $this->unlinkUpload('avatars', $profile['avatar'] ?? null);
+        $this->unlinkUpload('banners', $profile['banner'] ?? null);
+        $this->unlinkUpload('banners', $profile['bg_image'] ?? null);
+    }
+
+    private function uploadErrorMessage(int $code): string
+    {
+        return match ($code) {
+            UPLOAD_ERR_NO_FILE => 'Choose a file first.',
+            UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'That file is larger than the server allows.',
+            UPLOAD_ERR_PARTIAL => 'The upload was interrupted. Try again.',
+            UPLOAD_ERR_NO_TMP_DIR, UPLOAD_ERR_CANT_WRITE => 'The server could not store the file.',
+            default => 'Upload failed.',
+        };
     }
 }

@@ -19,6 +19,8 @@ $router->get('/content-policy', [HomeController::class, 'contentPolicy']);
 $router->get('/privacy', [HomeController::class, 'privacy']);
 $router->get('/terms', [HomeController::class, 'terms']);
 $router->get('/contact', [HomeController::class, 'contact']);
+$router->get('/health', [HomeController::class, 'health']);
+$router->get('/sitemap.xml', [HomeController::class, 'sitemap']);
 
 // Auth
 $router->get('/login', [AuthController::class, 'showLogin']);
@@ -35,27 +37,30 @@ $router->get('/discover', [DiscoverController::class, 'index']);
 $router->get('/click/{id}', [ProfileController::class, 'click']);
 $router->post('/report', [ProfileController::class, 'report']);
 
-// Dashboard (auth required via controller)
-$router->get('/dashboard', [DashboardController::class, 'index']);
-$router->get('/dashboard/profile', [DashboardController::class, 'profile']);
-$router->post('/dashboard/profile', [DashboardController::class, 'updateProfile']);
-$router->post('/dashboard/avatar', [DashboardController::class, 'uploadAvatar']);
-$router->get('/dashboard/links', [DashboardController::class, 'links']);
-$router->post('/dashboard/links', [DashboardController::class, 'createLink']);
-$router->post('/dashboard/links/{id}', [DashboardController::class, 'updateLink']);
-$router->post('/dashboard/links/{id}/delete', [DashboardController::class, 'deleteLink']);
-$router->post('/dashboard/links/reorder', [DashboardController::class, 'reorderLinks']);
-$router->get('/dashboard/appearance', [DashboardController::class, 'appearance']);
-$router->post('/dashboard/appearance', [DashboardController::class, 'updateAppearance']);
-$router->post('/dashboard/banner', [DashboardController::class, 'uploadBanner']);
-$router->get('/dashboard/account', [DashboardController::class, 'account']);
-$router->post('/dashboard/account', [DashboardController::class, 'updateAccount']);
+// Dashboard (auth enforced by middleware)
+$router->get('/dashboard', [DashboardController::class, 'index'], ['AuthMiddleware']);
+$router->get('/dashboard/profile', [DashboardController::class, 'profile'], ['AuthMiddleware']);
+$router->post('/dashboard/profile', [DashboardController::class, 'updateProfile'], ['AuthMiddleware']);
+$router->post('/dashboard/avatar', [DashboardController::class, 'uploadAvatar'], ['AuthMiddleware']);
+$router->post('/dashboard/avatar/delete', [DashboardController::class, 'deleteAvatar'], ['AuthMiddleware']);
+$router->get('/dashboard/links', [DashboardController::class, 'links'], ['AuthMiddleware']);
+$router->post('/dashboard/links', [DashboardController::class, 'createLink'], ['AuthMiddleware']);
+$router->post('/dashboard/links/reorder', [DashboardController::class, 'reorderLinks'], ['AuthMiddleware']);
+$router->post('/dashboard/links/{id}', [DashboardController::class, 'updateLink'], ['AuthMiddleware']);
+$router->post('/dashboard/links/{id}/delete', [DashboardController::class, 'deleteLink'], ['AuthMiddleware']);
+$router->post('/dashboard/links/{id}/move', [DashboardController::class, 'moveLink'], ['AuthMiddleware']);
+$router->get('/dashboard/appearance', [DashboardController::class, 'appearance'], ['AuthMiddleware']);
+$router->post('/dashboard/appearance', [DashboardController::class, 'updateAppearance'], ['AuthMiddleware']);
+$router->post('/dashboard/banner', [DashboardController::class, 'uploadBanner'], ['AuthMiddleware']);
+$router->post('/dashboard/banner/delete', [DashboardController::class, 'deleteBanner'], ['AuthMiddleware']);
+$router->get('/dashboard/account', [DashboardController::class, 'account'], ['AuthMiddleware']);
+$router->post('/dashboard/account', [DashboardController::class, 'updateAccount'], ['AuthMiddleware']);
 
 // Admin
-$router->get('/admin', [AdminController::class, 'index']);
-$router->get('/admin/users', [AdminController::class, 'users']);
-$router->post('/admin/users', [AdminController::class, 'userAction']);
-$router->get('/admin/reports', [AdminController::class, 'reports']);
-$router->post('/admin/reports', [AdminController::class, 'reportAction']);
-$router->get('/admin/settings', [AdminController::class, 'settings']);
-$router->post('/admin/settings', [AdminController::class, 'updateSettings']);
+$router->get('/admin', [AdminController::class, 'index'], ['AdminMiddleware']);
+$router->get('/admin/users', [AdminController::class, 'users'], ['AdminMiddleware']);
+$router->post('/admin/users', [AdminController::class, 'userAction'], ['AdminMiddleware']);
+$router->get('/admin/reports', [AdminController::class, 'reports'], ['AdminMiddleware']);
+$router->post('/admin/reports', [AdminController::class, 'reportAction'], ['AdminMiddleware']);
+$router->get('/admin/settings', [AdminController::class, 'settings'], ['AdminMiddleware']);
+$router->post('/admin/settings', [AdminController::class, 'updateSettings'], ['AdminMiddleware']);

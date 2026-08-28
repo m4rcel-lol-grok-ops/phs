@@ -7,10 +7,19 @@ class AdminMiddleware
 {
     public function handle(): void
     {
-        if (!is_logged_in() || !is_admin()) {
-            http_response_code(403);
-            require BASE_PATH . '/resources/views/errors/403.php';
-            exit;
+        // Not logged in at all: send to login rather than showing a bare 403.
+        if (current_user() === null) {
+            (new AuthMiddleware())->handle();
+            return;
         }
+        if (is_admin()) {
+            return;
+        }
+        http_response_code(403);
+        if (wants_json()) {
+            json_response(['error' => 'Administrator access required.'], 403);
+        }
+        require BASE_PATH . '/resources/views/errors/403.php';
+        exit;
     }
 }

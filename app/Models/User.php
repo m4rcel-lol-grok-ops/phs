@@ -32,17 +32,34 @@ class User
         return $stmt->fetch() ?: null;
     }
 
+    /** Single lookup across both identifier columns, for the login form. */
+    public static function findByUsernameOrEmail(string $identifier): ?array
+    {
+        $db = Database::getInstance();
+        $stmt = $db->prepare('SELECT * FROM users WHERE username = ? OR email = ? LIMIT 1');
+        $stmt->execute([$identifier, $identifier]);
+        return $stmt->fetch() ?: null;
+    }
+
     public static function create(string $username, string $email, string $password): int
     {
         $db = Database::getInstance();
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $token = bin2hex(random_bytes(32));
-        $stmt = $db->prepare('INSERT INTO users (username, email, password_hash, verification_token) VALUES (?, ?, ?, ?)');
-        $stmt->execute([$username, $email, $hash, $token]);
-        $id = (int)$db->lastInsertId();
 
-        // Create default profile
-        $db->prepare('INSERT INTO profiles (user_id, display_name) VALUES (?, ?)')->execute([$id, $username]);
+        // A user without a profile row breaks every dashboard page, so both
+        // inserts succeed together or not at all.
+        $db->beginTransaction();
+        try {
+            $stmt = $db->prepare('INSERT INTO users (username, email, password_hash, verification_token) VALUES (?, ?, ?, ?)');
+            $stmt->execute([$username, $email, $hash, $token]);
+            $id = (int)$db->lastInsertId();
+            $db->prepare('INSERT INTO profiles (user_id, display_name) VALUES (?, ?)')->execute([$id, $username]);
+            $db->commit();
+        } catch (\Throwable $e) {
+            $db->rollBack();
+            throw $e;
+        }
         return $id;
     }
 
