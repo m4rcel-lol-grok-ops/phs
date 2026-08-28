@@ -280,6 +280,15 @@ class DashboardController
         $db = Database::getInstance();
         $action = $_POST['action'] ?? '';
 
+        if ($action === 'visibility') {
+            Profile::update((int)$user['id'], [
+                'is_public' => isset($_POST['is_public']) ? 1 : 0,
+                'show_in_discover' => isset($_POST['show_in_discover']) ? 1 : 0,
+            ]);
+            flash('success', 'Visibility updated.');
+            redirect('/dashboard/account');
+        }
+
         if ($action === 'password') {
             $current = (string)($_POST['current_password'] ?? '');
             $new = (string)($_POST['new_password'] ?? '');

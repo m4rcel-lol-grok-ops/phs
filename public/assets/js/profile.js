@@ -1,124 +1,98 @@
-/* Public profile page: music player, report modal, optional particle effects. */
-(function () {
+(function() {
   'use strict';
+  
+  // Report Modal
+  const reportTrigger = document.getElementById('report-trigger');
+  const reportModal = document.getElementById('report-modal');
+  const reportCancel = document.getElementById('report-cancel');
+  
+  if (reportTrigger && reportModal) {
+    function openModal() {
+      reportModal.removeAttribute('hidden');
+      const firstInput = reportModal.querySelector('select, input, textarea');
+      if (firstInput) firstInput.focus();
+    }
+    function closeModal() {
+      reportModal.setAttribute('hidden', 'true');
+      reportTrigger.focus();
+    }
+    
+    reportTrigger.addEventListener('click', openModal);
+    if(reportCancel) reportCancel.addEventListener('click', closeModal);
+    
+    reportModal.addEventListener('click', (e) => {
+      if (e.target === reportModal) closeModal();
+    });
+    
+    document.addEventListener('keydown', (e) => {
+      if (!reportModal.hasAttribute('hidden')) {
+        if (e.key === 'Escape') {
+          closeModal();
+        } else if (e.key === 'Tab') {
+          const focusable = reportModal.querySelectorAll('a[href], button, textarea, input, select');
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          if (e.shiftKey) {
+            if (document.activeElement === first) {
+              last.focus();
+              e.preventDefault();
+            }
+          } else {
+            if (document.activeElement === last) {
+              first.focus();
+              e.preventDefault();
+            }
+          }
+        }
+      }
+    });
+  }
 
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* ------------------------------------------------------------- music */
-
-  var audio = document.getElementById('profile-audio');
-  var playBtn = document.getElementById('music-play');
-
-  if (audio && playBtn) {
-    var setPlaying = function (playing) {
-      playBtn.textContent = playing ? '❚❚' : '▶';
-      playBtn.setAttribute('aria-label', playing ? 'Pause track' : 'Play track');
-    };
-
-    playBtn.addEventListener('click', function () {
-      if (audio.paused) {
-        // play() rejects on autoplay policy or a dead URL; surface it on the
-        // button instead of failing silently.
-        var attempt = audio.play();
-        if (attempt && typeof attempt.catch === 'function') {
-          attempt.catch(function () {
-            playBtn.textContent = '⚠';
-            playBtn.setAttribute('aria-label', 'Track could not be played');
+  // Effects (if enabled and prefers-reduced-motion is false)
+  const effectsLayer = document.getElementById('effects-layer');
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (effectsLayer && !prefersReduced) {
+    const effectType = effectsLayer.getAttribute('data-effect');
+    if (effectType === 'particles' || effectType === 'snow') {
+      const count = effectType === 'snow' ? 50 : 30;
+      for (let i = 0; i < count; i++) {
+        const p = document.createElement('div');
+        p.style.position = 'absolute';
+        p.style.background = effectType === 'snow' ? '#fff' : 'var(--p-accent, #ff9900)';
+        p.style.borderRadius = '50%';
+        const size = Math.random() * 4 + 2;
+        p.style.width = `${size}px`;
+        p.style.height = `${size}px`;
+        p.style.left = `${Math.random() * 100}vw`;
+        p.style.top = `${Math.random() * 100}vh`;
+        p.style.opacity = Math.random() * 0.5 + 0.2;
+        
+        if (typeof p.animate === 'function') {
+          p.animate([
+            { transform: `translate(0, 0)` },
+            { transform: `translate(${Math.random()*100 - 50}px, ${effectType==='snow' ? '100vh' : Math.random()*100 - 50 + 'px'})` }
+          ], {
+            duration: Math.random() * 3000 + 3000,
+            iterations: Infinity,
+            direction: effectType === 'particles' ? 'alternate' : 'normal',
+            easing: 'linear'
           });
         }
-      } else {
-        audio.pause();
+        
+        effectsLayer.appendChild(p);
       }
-    });
-
-    audio.addEventListener('play', function () { setPlaying(true); });
-    audio.addEventListener('pause', function () { setPlaying(false); });
-    audio.addEventListener('ended', function () { setPlaying(false); });
-    audio.addEventListener('error', function () {
-      playBtn.textContent = '⚠';
-      playBtn.setAttribute('aria-label', 'Track could not be loaded');
-    });
-  }
-
-  /* ------------------------------------------------------- report modal */
-
-  var openBtn = document.getElementById('report-btn');
-  var modal = document.getElementById('report-modal');
-
-  if (openBtn && modal) {
-    var closeBtn = document.getElementById('report-close');
-    var reason = document.getElementById('report-reason');
-    var lastFocused = null;
-
-    var open = function () {
-      lastFocused = document.activeElement;
-      modal.hidden = false;
-      document.body.style.overflow = 'hidden';
-      if (reason) reason.focus();
-    };
-
-    var close = function () {
-      modal.hidden = true;
-      document.body.style.overflow = '';
-      if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
-    };
-
-    openBtn.addEventListener('click', open);
-    if (closeBtn) closeBtn.addEventListener('click', close);
-
-    // Click on the backdrop only — not on the card itself.
-    modal.addEventListener('mousedown', function (e) {
-      if (e.target === modal) close();
-    });
-
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !modal.hidden) close();
-    });
-
-    // Keep focus inside the dialog while it is open.
-    modal.addEventListener('keydown', function (e) {
-      if (e.key !== 'Tab') return;
-      var focusable = modal.querySelectorAll('select, textarea, button, [href], input:not([type="hidden"])');
-      if (!focusable.length) return;
-      var first = focusable[0];
-      var last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    });
-  }
-
-  /* ------------------------------------------------ particle / snow effect */
-
-  var layer = document.querySelector('.fx-layer[data-fx]');
-  if (layer && !reduceMotion) {
-    var kind = layer.dataset.fx;
-    var count = kind === 'snow' ? 40 : 28;
-    var fragment = document.createDocumentFragment();
-
-    for (var i = 0; i < count; i++) {
-      var dot = document.createElement('span');
-      var size = kind === 'snow' ? rand(2, 6) : rand(2, 4);
-      dot.className = 'fx-dot';
-      dot.style.width = size + 'px';
-      dot.style.height = size + 'px';
-      dot.style.left = rand(0, 100) + '%';
-      dot.style.animationDuration = rand(kind === 'snow' ? 9 : 6, kind === 'snow' ? 20 : 14) + 's';
-      // Negative delay starts each dot mid-flight, so the screen is populated
-      // immediately instead of filling in from the top.
-      dot.style.animationDelay = '-' + rand(0, 18) + 's';
-      dot.style.setProperty('--fx-drift', rand(-60, 60) + 'px');
-      dot.style.setProperty('--fx-opacity', (rand(30, 75) / 100).toString());
-      fragment.appendChild(dot);
+    } else if (effectType === 'scanlines') {
+      effectsLayer.style.background = 'linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06))';
+      effectsLayer.style.backgroundSize = '100% 2px, 3px 100%';
+    } else if (effectType === 'glow') {
+      effectsLayer.style.boxShadow = 'inset 0 0 100px var(--p-accent, #ff9900)';
+      effectsLayer.style.opacity = '0.2';
+    } else if (effectType === 'gradient') {
+      effectsLayer.style.background = 'linear-gradient(45deg, var(--p-bg, #0b0a09), var(--p-accent, #ff9900))';
+      effectsLayer.style.opacity = '0.1';
+    } else if (effectType === 'crt') {
+      effectsLayer.style.background = 'radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.5) 100%)';
+      effectsLayer.style.boxShadow = 'inset 0 0 50px rgba(255, 255, 255, 0.1)';
     }
-    layer.appendChild(fragment);
-  }
-
-  function rand(min, max) {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 })();

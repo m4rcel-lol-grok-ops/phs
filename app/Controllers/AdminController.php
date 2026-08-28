@@ -23,7 +23,7 @@ class AdminController
         ];
 
         $recentUsers = $db->query(
-            'SELECT id, username, created_at, is_disabled FROM users ORDER BY created_at DESC LIMIT 5'
+            'SELECT id, username, email, role, created_at, is_disabled FROM users ORDER BY created_at DESC LIMIT 5'
         )->fetchAll();
 
         $recentActions = $db->query(

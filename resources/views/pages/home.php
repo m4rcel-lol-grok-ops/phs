@@ -1,130 +1,68 @@
 <?php ob_start(); ?>
-<section class="hero">
-    <div class="container">
-        <span class="eyebrow">Parody project · Self-hostable</span>
-        <h1>Your links deserve <span class="accent">better</span>.</h1>
-        <p class="subtitle">
-            Build your own ridiculous little corner of the internet — one page, all your links,
-            an unnecessarily dramatic amount of orange.
-        </p>
-        <div class="hero-actions">
-            <?php if (is_logged_in()): ?>
-                <a href="/dashboard" class="btn btn-primary btn-lg">Go to dashboard</a>
-            <?php elseif (setting_bool('registration_enabled', true)): ?>
-                <a href="/register" class="btn btn-primary btn-lg">Create your profile</a>
-            <?php endif; ?>
-            <a href="/discover" class="btn btn-secondary btn-lg">Browse profiles</a>
-        </div>
-        <p class="hero-note">
-            No subscriptions. No mysterious algorithms.<br>
-            Just you, your links, and questionable taste.
-        </p>
-
-        <?php if ($stats['profiles'] > 0): ?>
-            <div class="hero-stats">
-                <div>
-                    <div class="hero-stat-value"><?= e(format_number($stats['profiles'])) ?></div>
-                    <div class="hero-stat-label">Profiles</div>
-                </div>
-                <div>
-                    <div class="hero-stat-value"><?= e(format_number($stats['links'])) ?></div>
-                    <div class="hero-stat-label">Links</div>
-                </div>
-                <div>
-                    <div class="hero-stat-value"><?= e(format_number($stats['views'])) ?></div>
-                    <div class="hero-stat-label">Page views</div>
-                </div>
-            </div>
+<div style="text-align: center; padding: 4rem 1rem; position: relative; overflow: hidden;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80vw; height: 80vw; max-width: 800px; max-height: 800px; background: radial-gradient(circle, var(--accent) 0%, transparent 60%); opacity: 0.1; z-index: -1;"></div>
+    <h1 style="font-size: clamp(3rem, 8vw, 5rem); margin-bottom: 1rem; line-height: 1;">One link.<br>Zero bullshit.</h1>
+    <p style="font-size: 1.2rem; color: var(--text-muted); max-width: 600px; margin: 0 auto 2rem auto;">
+        The black and orange link-in-bio platform for totally real creators. Share your links, customize your aesthetic, and embrace the parody.
+    </p>
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+        <?php if (setting_bool('registration_enabled', true)): ?>
+            <a href="<?= e(url('/register')) ?>" class="btn btn-primary" style="font-size: 1.1rem; padding: 1rem 2rem;">Claim your profile</a>
         <?php endif; ?>
+        <a href="<?= e(url('/discover')) ?>" class="btn" style="font-size: 1.1rem; padding: 1rem 2rem;">Explore</a>
     </div>
-</section>
+</div>
+
+<div class="container mt-8 mb-8">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+        <div class="card text-center">
+            <h3 style="font-size: 2.5rem; color: var(--accent);"><?= e(format_number($stats['profiles'] ?? 0)) ?></h3>
+            <div class="text-muted">Active Profiles</div>
+        </div>
+        <div class="card text-center">
+            <h3 style="font-size: 2.5rem; color: var(--accent);"><?= e(format_number($stats['links'] ?? 0)) ?></h3>
+            <div class="text-muted">Links Shared</div>
+        </div>
+        <div class="card text-center">
+            <h3 style="font-size: 2.5rem; color: var(--accent);"><?= e(format_number($stats['views'] ?? 0)) ?></h3>
+            <div class="text-muted">Total Views</div>
+        </div>
+    </div>
+</div>
 
 <?php if (!empty($featured)): ?>
-<section class="section-tight">
-    <div class="container">
-        <div class="section-head">
-            <h2 class="section-title">People already being unnecessarily visible</h2>
-            <p class="section-sub">A few profiles from this instance.</p>
-        </div>
-        <div class="discover-grid">
-            <?php foreach ($featured as $p): ?>
-                <?php $avatar = upload_filename($p['avatar'] ?? null); ?>
-                <a href="/<?= e($p['username']) ?>" class="discover-card">
-                    <?php if ($avatar !== null): ?>
-                        <img src="/uploads/avatars/<?= e($avatar) ?>" alt="" class="discover-avatar"
-                             width="72" height="72" loading="lazy" decoding="async">
+<div class="container mb-8">
+    <h2 class="text-center mb-4">Featured Profiles</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+        <?php foreach ($featured as $profile): ?>
+            <a href="<?= e(url('/' . $profile['username'])) ?>" class="card" style="display: flex; align-items: center; gap: 1rem; text-decoration: none; transition: transform 0.2s;">
+                <div style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; background: var(--bg-elevated); flex-shrink: 0;">
+                    <?php $avatarFile = upload_filename($profile['avatar'] ?? null); ?>
+                    <?php if ($avatarFile !== null): ?>
+                        <img src="<?= e('/uploads/avatars/' . $avatarFile) ?>" alt="" style="width:100%;height:100%;object-fit:cover;">
                     <?php else: ?>
-                        <div class="discover-avatar-ph" aria-hidden="true">
-                            <?= e(mb_strtoupper(mb_substr((string)($p['display_name'] ?: $p['username']), 0, 1))) ?>
+                        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--accent);color:#000;font-weight:bold;font-size:1.5rem;">
+                            <?= e(strtoupper(substr($profile['display_name'] ?: $profile['username'], 0, 1))) ?>
                         </div>
                     <?php endif; ?>
-                    <div class="discover-name">
-                        <?= e($p['display_name'] ?: $p['username']) ?>
-                        <?php if ($p['is_verified']): ?><span class="verified-badge" title="Verified">✓</span><?php endif; ?>
+                </div>
+                <div style="min-width: 0; flex: 1;">
+                    <div style="font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        <?= e($profile['display_name'] ?: $profile['username']) ?>
+                        <?php if ($profile['is_verified']): ?><span style="color:var(--accent);">✓</span><?php endif; ?>
                     </div>
-                    <div class="discover-user">@<?= e($p['username']) ?></div>
-                    <?php if (!empty($p['bio'])): ?>
-                        <div class="discover-bio"><?= e($p['bio']) ?></div>
-                    <?php endif; ?>
-                    <div class="discover-foot">
-                        <span><?= e(format_number((int)$p['profile_views'])) ?> views</span>
-                    </div>
-                </a>
-            <?php endforeach; ?>
-        </div>
-        <p class="text-center mt-3"><a href="/discover" class="btn btn-secondary btn-sm">See all profiles →</a></p>
+                    <div style="color: var(--text-muted); font-size: 0.9rem;">@<?= e($profile['username']) ?></div>
+                </div>
+            </a>
+        <?php endforeach; ?>
     </div>
-</section>
+</div>
 <?php endif; ?>
 
-<section class="section">
-    <div class="container">
-        <div class="section-head">
-            <h2 class="section-title">Why does this exist?</h2>
-            <p class="section-sub">Honestly? Because the internet needed one more bio-link site with extra orange.</p>
-        </div>
-        <div class="features-grid">
-            <div class="feature-card">
-                <div class="icon" aria-hidden="true">🎨</div>
-                <h3>Themes &amp; customization</h3>
-                <p>Six themes, or override every colour yourself. Fonts, backgrounds, gradients, and optional effects.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon" aria-hidden="true">🔗</div>
-                <h3>Unlimited links</h3>
-                <p>Add as many as you want. Drag to reorder, hide without deleting, track every click.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon" aria-hidden="true">📊</div>
-                <h3>Real statistics</h3>
-                <p>Profile views and link clicks, deduplicated so a refresh does not inflate your numbers.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon" aria-hidden="true">🎵</div>
-                <h3>Background music</h3>
-                <p>Attach a track. It never autoplays — visitors decide whether they want the vibe.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon" aria-hidden="true">✨</div>
-                <h3>Visual effects</h3>
-                <p>Particles, glow, snow, CRT, scanlines. Optional, and switched off for reduced-motion visitors.</p>
-            </div>
-            <div class="feature-card">
-                <div class="icon" aria-hidden="true">🔒</div>
-                <h3>Self-hostable</h3>
-                <p>Your data, your server, one Docker command. No corporate overlords required.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<?php if (!is_logged_in() && setting_bool('registration_enabled', true)): ?>
-<section class="section" style="padding-top:0">
-    <div class="container text-center">
-        <h2 class="section-title">Become unnecessarily visible</h2>
-        <p class="section-sub">It takes about 30 seconds. Your future self will either thank you or question everything.</p>
-        <a href="/register" class="btn btn-primary btn-lg">Create your profile</a>
-    </div>
-</section>
-<?php endif; ?>
+<div style="background: var(--bg-card); padding: 4rem 1rem; border-top: 1px solid var(--border); text-align: center;">
+    <h2 style="margin-bottom: 1rem;">No explicit content.</h2>
+    <p style="color: var(--text-muted); max-width: 600px; margin: 0 auto;">
+        We are a parody site. We host links, not videos. Any sexually explicit or NSFW material will result in an immediate ban. 
+    </p>
+</div>
 <?php $content = ob_get_clean(); require BASE_PATH . '/resources/views/layouts/main.php';

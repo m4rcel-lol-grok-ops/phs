@@ -1,239 +1,158 @@
-/* Site chrome: navigation, confirmations, link reordering, alert dismissal. */
-(function () {
+(function() {
   'use strict';
 
-  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  /* ------------------------------------------------------------ mobile nav */
-
-  var toggle = document.querySelector('.nav-toggle');
-  var nav = document.getElementById('primary-nav');
-
-  if (toggle && nav) {
-    var setNav = function (open) {
-      nav.classList.toggle('is-open', open);
-      toggle.setAttribute('aria-expanded', String(open));
-      toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-      document.body.classList.toggle('nav-open', open);
-    };
-
-    toggle.addEventListener('click', function () {
-      setNav(!nav.classList.contains('is-open'));
+  // Mobile Nav
+  const navToggle = document.querySelector('.nav-toggle');
+  const navLinks = document.querySelector('.nav-links');
+  if (navToggle && navLinks) {
+    navToggle.addEventListener('click', () => {
+      const isExpanded = navLinks.getAttribute('aria-expanded') === 'true';
+      navLinks.setAttribute('aria-expanded', !isExpanded);
+      navToggle.setAttribute('aria-expanded', !isExpanded);
     });
 
-    // Escape closes the menu and returns focus to the button that opened it.
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && nav.classList.contains('is-open')) {
-        setNav(false);
-        toggle.focus();
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks.getAttribute('aria-expanded') === 'true') {
+        navLinks.setAttribute('aria-expanded', 'false');
+        navToggle.setAttribute('aria-expanded', 'false');
+        navToggle.focus();
       }
     });
 
-    document.addEventListener('click', function (e) {
-      if (nav.classList.contains('is-open') && !nav.contains(e.target) && !toggle.contains(e.target)) {
-        setNav(false);
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.site-header') && navLinks.getAttribute('aria-expanded') === 'true') {
+        navLinks.setAttribute('aria-expanded', 'false');
+        navToggle.setAttribute('aria-expanded', 'false');
       }
     });
 
-    // The menu is only a mobile affordance; resizing past the breakpoint while
-    // it is open would otherwise leave body scroll locked.
-    window.addEventListener('resize', function () {
-      if (window.innerWidth > 820 && nav.classList.contains('is-open')) {
-        setNav(false);
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 820 && navLinks.getAttribute('aria-expanded') === 'true') {
+        navLinks.setAttribute('aria-expanded', 'false');
+        navToggle.setAttribute('aria-expanded', 'false');
       }
     });
   }
 
-  /* ---------------------------------------------------- confirm before act */
-
-  document.querySelectorAll('[data-confirm]').forEach(function (el) {
-    var handler = function (e) {
-      if (!window.confirm(el.dataset.confirm || 'Are you sure?')) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    // Bind to submit on forms and click on buttons/links, so a confirmation
-    // cannot be bypassed by pressing Enter inside a field.
-    if (el.tagName === 'FORM') {
-      el.addEventListener('submit', handler);
-    } else {
-      el.addEventListener('click', handler);
-    }
+  // Flash Dismissal
+  document.querySelectorAll('.alert-close').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const alert = e.target.closest('.alert');
+      if (alert) alert.remove();
+    });
+  });
+  
+  document.querySelectorAll('.alert-success, .alert-info').forEach(alert => {
+    setTimeout(() => {
+      if (alert && alert.parentNode) alert.remove();
+    }, 4000);
   });
 
-  /* --------------------------------------------------- copy-to-clipboard */
-
-  document.querySelectorAll('[data-copy]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var text = btn.dataset.copy;
-      var done = function () {
-        var original = btn.textContent;
-        btn.textContent = 'Copied';
-        btn.disabled = true;
-        window.setTimeout(function () {
-          btn.textContent = original;
-          btn.disabled = false;
-        }, 1400);
-      };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(done).catch(function () {});
-        return;
+  // Confirmations
+  document.querySelectorAll('form[data-confirm]').forEach(form => {
+    form.addEventListener('submit', (e) => {
+      if (!window.confirm(form.getAttribute('data-confirm'))) {
+        e.preventDefault();
       }
-      // navigator.clipboard is unavailable over plain http, which is the
-      // normal case for a self-hosted instance behind a proxy.
-      var field = document.createElement('textarea');
-      field.value = text;
-      field.setAttribute('readonly', '');
-      field.style.position = 'fixed';
-      field.style.opacity = '0';
-      document.body.appendChild(field);
-      field.select();
-      try { document.execCommand('copy'); done(); } catch (err) { /* nothing to do */ }
-      document.body.removeChild(field);
     });
   });
 
-  /* -------------------------------------------- appearance conditional UI */
-
-  document.querySelectorAll('[data-toggles]').forEach(function (input) {
-    var target = document.getElementById(input.dataset.toggles);
-    if (!target) return;
-    var sync = function () {
-      var on = input.type === 'checkbox' ? input.checked : Boolean(input.value);
-      target.classList.toggle('is-visible', on);
-    };
-    input.addEventListener('change', sync);
-    sync();
+  // Copy to clipboard
+  document.querySelectorAll('[data-copy]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      navigator.clipboard.writeText(btn.getAttribute('data-copy')).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = 'Copied!';
+        setTimeout(() => btn.innerText = originalText, 2000);
+      });
+    });
   });
 
-  document.querySelectorAll('[data-shows-when]').forEach(function (group) {
-    var config = group.dataset.showsWhen.split(':');
-    var source = document.querySelector('[name="' + config[0] + '"]');
-    if (!source) return;
-    var expected = config[1].split('|');
-    var sync = function () {
-      group.classList.toggle('is-visible', expected.indexOf(source.value) !== -1);
-    };
-    source.addEventListener('change', sync);
-    sync();
-  });
+  // Conditional Fields
+  const conditionTriggers = document.querySelectorAll('[data-conditions]');
+  function evaluateConditions() {
+    conditionTriggers.forEach(trigger => {
+      const conditions = JSON.parse(trigger.getAttribute('data-conditions') || '{}');
+      for (const [targetId, values] of Object.entries(conditions)) {
+        const target = document.getElementById(targetId);
+        if (target) {
+          const match = values.includes(trigger.value) || (trigger.type === 'checkbox' && values.includes(trigger.checked));
+          if (match) {
+            target.removeAttribute('hidden');
+          } else {
+            target.setAttribute('hidden', 'true');
+          }
+        }
+      }
+    });
+  }
+  conditionTriggers.forEach(t => t.addEventListener('change', evaluateConditions));
+  evaluateConditions();
 
-  /* ------------------------------------------------------- link reordering */
-
-  var list = document.getElementById('link-list');
+  // Link Reordering (Basic Drag & Drop)
+  const list = document.querySelector('.sortable-list');
   if (list) {
-    var dragged = null;
+    let draggedItem = null;
+    list.addEventListener('dragstart', (e) => {
+      if (e.target.classList.contains('link-row') || e.target.closest('.link-drag-handle')) {
+        draggedItem = e.target.closest('.link-row');
+        draggedItem.style.opacity = 0.5;
+        e.dataTransfer.effectAllowed = 'move';
+      }
+    });
+    list.addEventListener('dragend', (e) => {
+      if (draggedItem) {
+        draggedItem.style.opacity = '';
+        saveOrder();
+        draggedItem = null;
+      }
+    });
+    list.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const afterElement = getDragAfterElement(list, e.clientY);
+      const row = draggedItem;
+      if (row) {
+        const details = row.nextElementSibling && row.nextElementSibling.tagName === 'DETAILS' ? row.nextElementSibling : null;
+        if (afterElement == null) {
+          list.appendChild(row);
+          if (details) list.appendChild(details);
+        } else {
+          list.insertBefore(row, afterElement);
+          if (details) list.insertBefore(details, afterElement);
+        }
+      }
+    });
 
-    var saveOrder = function () {
-      var ids = Array.prototype.map.call(
-        list.querySelectorAll('.link-item'),
-        function (item) { return item.dataset.id; }
-      );
-      var token = document.querySelector('meta[name="csrf-token"]');
-      var body = new FormData();
-      body.append('_csrf', token ? token.content : '');
-      body.append('order', JSON.stringify(ids));
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll('.link-row:not(.dragging)')].filter(el => el !== draggedItem);
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset: offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
 
+    function saveOrder() {
+      const order = [...list.querySelectorAll('.link-row')].map(r => r.getAttribute('data-id'));
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      if (!csrfMeta) return;
+      const csrf = csrfMeta.content;
+      
       fetch('/dashboard/links/reorder', {
         method: 'POST',
-        body: body,
-        credentials: 'same-origin',
-        headers: { 'Accept': 'application/json' }
-      })
-        .then(function (res) { return res.ok ? res.json() : Promise.reject(res); })
-        .then(function () { announce('Order saved.'); })
-        // The order is only persisted server-side; if that failed, reloading is
-        // the honest way to show the user what is actually stored.
-        .catch(function () { announce('Could not save the new order. Reloading…'); window.setTimeout(function () { window.location.reload(); }, 1200); });
-    };
-
-    var announce = function (message) {
-      var region = document.getElementById('reorder-status');
-      if (region) region.textContent = message;
-    };
-
-    list.querySelectorAll('.link-item').forEach(function (item) {
-      var handle = item.querySelector('.link-handle');
-      if (!handle) return;
-
-      // Only the handle starts a drag, so text inside the row stays selectable.
-      handle.addEventListener('mousedown', function () { item.setAttribute('draggable', 'true'); });
-      handle.addEventListener('touchstart', function () { item.setAttribute('draggable', 'true'); }, { passive: true });
-      item.addEventListener('mouseup', function () { item.removeAttribute('draggable'); });
-
-      item.addEventListener('dragstart', function (e) {
-        dragged = item;
-        item.classList.add('is-dragging');
-        if (e.dataTransfer) {
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', item.dataset.id);
-        }
-      });
-
-      item.addEventListener('dragend', function () {
-        item.classList.remove('is-dragging');
-        item.removeAttribute('draggable');
-        list.querySelectorAll('.is-drop-target').forEach(function (el) {
-          el.classList.remove('is-drop-target');
-        });
-        if (dragged) { dragged = null; saveOrder(); }
-      });
-
-      item.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        if (dragged && dragged !== item) item.classList.add('is-drop-target');
-      });
-
-      item.addEventListener('dragleave', function () { item.classList.remove('is-drop-target'); });
-
-      item.addEventListener('drop', function (e) {
-        e.preventDefault();
-        item.classList.remove('is-drop-target');
-        if (!dragged || dragged === item) return;
-
-        var rows = Array.prototype.slice.call(list.querySelectorAll('.link-item'));
-        var from = rows.indexOf(dragged);
-        var to = rows.indexOf(item);
-        // Each row is followed by its own <details> editor; move the pair so
-        // the edit form never detaches from its link.
-        var draggedGroup = groupOf(dragged);
-        if (from < to) {
-          insertAfter(draggedGroup, groupOf(item));
-        } else {
-          groupOf(item)[0].before.apply(groupOf(item)[0], draggedGroup);
-        }
-      });
-    });
-
-    var groupOf = function (item) {
-      var nodes = [item];
-      var next = item.nextElementSibling;
-      if (next && next.classList.contains('link-editor')) nodes.push(next);
-      return nodes;
-    };
-
-    var insertAfter = function (nodes, targetGroup) {
-      var anchor = targetGroup[targetGroup.length - 1];
-      nodes.forEach(function (node) {
-        anchor.after(node);
-        anchor = node;
-      });
-    };
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ _csrf: csrf, order: JSON.stringify(order) })
+      }).then(res => res.json()).then(data => {
+        const announcer = document.getElementById('sr-announcer');
+        if (announcer) announcer.textContent = 'Links reordered successfully.';
+      }).catch(err => console.error(err));
+    }
   }
-
-  /* --------------------------------------------------------- auto-dismiss */
-
-  document.querySelectorAll('.alert').forEach(function (alert) {
-    // Errors stay until the user navigates; they usually need to be read and
-    // acted on, unlike a success confirmation.
-    if (alert.classList.contains('alert-error')) return;
-    window.setTimeout(function () {
-      if (reduceMotion) { alert.remove(); return; }
-      alert.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-      alert.style.opacity = '0';
-      alert.style.transform = 'translateY(-6px)';
-      window.setTimeout(function () { alert.remove(); }, 420);
-    }, 6000);
-  });
 })();

@@ -1,117 +1,113 @@
-<?php
-ob_start();
-$avatar = upload_filename($profile['avatar'] ?? null);
-?>
-<div class="dash-layout">
-    <?php require __DIR__ . '/_sidebar.php'; ?>
+<?php ob_start(); ?>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <?php require BASE_PATH . '/resources/views/dashboard/_sidebar.php'; ?>
+    </aside>
+    <section class="dashboard-content">
+        <h1 class="mb-4">Profile Details</h1>
+        
+        <div class="card mb-4">
+            <h2>Images</h2>
+            <div style="display:flex; gap: 2rem; flex-wrap: wrap;">
+                <div>
+                    <label style="display:block; font-weight:600; margin-bottom: 0.5rem;">Avatar</label>
+                    <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--bg-elevated); margin-bottom: 1rem; overflow: hidden; display: flex; align-items:center; justify-content:center;">
+                        <?php $avatarFile = upload_filename($profile['avatar'] ?? null); ?>
+                        <?php if ($avatarFile !== null): ?>
+                            <img src="/uploads/avatars/<?= e($avatarFile) ?>" alt="Avatar" style="width:100%;height:100%;object-fit:cover;">
+                        <?php else: ?>
+                            <span style="font-size:2rem;color:var(--text-muted);">?</span>
+                        <?php endif; ?>
+                    </div>
+                    <form action="<?= e(url('/dashboard/avatar')) ?>" method="POST" enctype="multipart/form-data">
+                        <?= csrf_field() ?>
+                        <input type="file" name="avatar" accept="image/png, image/jpeg, image/webp" required class="input" style="padding: 0.25rem;">
+                        <button type="submit" class="btn btn-primary btn-sm mt-4">Upload</button>
+                    </form>
+                    <?php if ($profile['avatar']): ?>
+                    <form action="<?= e(url('/dashboard/avatar/delete')) ?>" method="POST" style="margin-top: 0.5rem;" data-confirm="Delete avatar?">
+                        <?= csrf_field() ?>
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
 
-    <div class="dash-content">
-        <div class="dash-header">
-            <div>
-                <h1>Edit profile</h1>
-                <p>Who you are, and who gets to see it.</p>
+                <div style="flex: 1; min-width: 250px;">
+                    <label style="display:block; font-weight:600; margin-bottom: 0.5rem;">Banner</label>
+                    <div style="width: 100%; height: 100px; border-radius: var(--radius-sm); background: var(--bg-elevated); margin-bottom: 1rem; overflow: hidden; display: flex; align-items:center; justify-content:center;">
+                        <?php $bannerFile = upload_filename($profile['banner'] ?? null); ?>
+                        <?php if ($bannerFile !== null): ?>
+                            <img src="/uploads/banners/<?= e($bannerFile) ?>" alt="Banner" style="width:100%;height:100%;object-fit:cover;">
+                        <?php else: ?>
+                            <span style="color:var(--text-muted);">No banner</span>
+                        <?php endif; ?>
+                    </div>
+                    <form action="<?= e(url('/dashboard/banner')) ?>" method="POST" enctype="multipart/form-data">
+                        <?= csrf_field() ?>
+                        <input type="file" name="banner" accept="image/png, image/jpeg, image/webp" required class="input" style="padding: 0.25rem;">
+                        <button type="submit" class="btn btn-primary btn-sm mt-4">Upload</button>
+                    </form>
+                    <?php if ($profile['banner']): ?>
+                    <form action="<?= e(url('/dashboard/banner/delete')) ?>" method="POST" style="margin-top: 0.5rem;" data-confirm="Delete banner?">
+                        <?= csrf_field() ?>
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                    <?php endif; ?>
+                </div>
             </div>
-            <a href="/<?= e($user['username']) ?>" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Preview ↗</a>
         </div>
 
-        <div class="card mb-3">
-            <div class="card-head"><h3>Avatar</h3></div>
-            <div class="flex items-center gap-2 flex-wrap mb-2">
-                <?php if ($avatar !== null): ?>
-                    <img src="/uploads/avatars/<?= e($avatar) ?>" alt="Your current avatar"
-                         width="72" height="72" style="border-radius:50%;object-fit:cover">
-                <?php else: ?>
-                    <div class="table-avatar" style="width:72px;height:72px;font-size:1.6rem" aria-hidden="true">
-                        <?= e(mb_strtoupper(mb_substr((string)($profile['display_name'] ?: $user['username']), 0, 1))) ?>
-                    </div>
-                <?php endif; ?>
-                <p class="text-muted text-sm">JPG, PNG, or WebP. Square images look best.</p>
-            </div>
-            <form method="post" action="/dashboard/avatar" enctype="multipart/form-data">
+        <div class="card">
+            <h2>Information</h2>
+            <form action="<?= e(url('/dashboard/profile')) ?>" method="POST">
                 <?= csrf_field() ?>
-                <div class="form-group">
-                    <label class="sr-only" for="avatar">Avatar image file</label>
-                    <input type="file" id="avatar" name="avatar" class="form-file"
-                           accept="image/jpeg,image/png,image/webp" required>
+                
+                <div class="input-group">
+                    <label for="display_name">Display Name</label>
+                    <input type="text" id="display_name" name="display_name" class="input" value="<?= old('display_name') ?? e($profile['display_name']) ?>">
                 </div>
-                <div class="field-actions">
-                    <button type="submit" class="btn btn-primary btn-sm">Upload avatar</button>
+
+                <div class="input-group">
+                    <label for="pronouns">Pronouns</label>
+                    <input type="text" id="pronouns" name="pronouns" class="input" value="<?= old('pronouns') ?? e($profile['pronouns']) ?>" placeholder="e.g. they/them">
+                </div>
+
+                <div class="input-group">
+                    <label for="bio">Bio</label>
+                    <textarea id="bio" name="bio" class="textarea"><?= old('bio') ?? e($profile['bio']) ?></textarea>
+                </div>
+
+                <div class="input-group">
+                    <label for="location">Location</label>
+                    <input type="text" id="location" name="location" class="input" value="<?= old('location') ?? e($profile['location']) ?>">
+                </div>
+
+                <div class="input-group">
+                    <label for="website">Primary Website</label>
+                    <input type="url" id="website" name="website" class="input" value="<?= old('website') ?? e($profile['website']) ?>">
+                </div>
+
+                <hr style="border-color: var(--border); margin: 2rem 0;">
+                <h2>Music Player (Optional)</h2>
+
+                <div class="input-group">
+                    <label for="music_url">Audio URL (mp3/wav)</label>
+                    <input type="url" id="music_url" name="music_url" class="input" value="<?= old('music_url') ?? e($profile['music_url']) ?>">
+                </div>
+                <div class="input-group">
+                    <label for="music_title">Track Title</label>
+                    <input type="text" id="music_title" name="music_title" class="input" value="<?= old('music_title') ?? e($profile['music_title']) ?>">
+                </div>
+                <div class="input-group">
+                    <label for="music_artist">Artist</label>
+                    <input type="text" id="music_artist" name="music_artist" class="input" value="<?= old('music_artist') ?? e($profile['music_artist']) ?>">
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">Save Profile</button>
                 </div>
             </form>
-            <?php if ($avatar !== null): ?>
-                <form method="post" action="/dashboard/avatar/delete" class="mt-2"
-                      data-confirm="Remove your avatar?">
-                    <?= csrf_field() ?>
-                    <button type="submit" class="btn btn-ghost btn-xs">Remove avatar</button>
-                </form>
-            <?php endif; ?>
         </div>
-
-        <div class="card mb-3">
-            <div class="card-head"><h3>Details</h3></div>
-            <form method="post" action="/dashboard/profile">
-                <?= csrf_field() ?>
-
-                <div class="form-group">
-                    <label class="form-label" for="display_name">Display name</label>
-                    <input type="text" id="display_name" name="display_name" class="form-input"
-                           maxlength="64" value="<?= e($profile['display_name'] ?? '') ?>"
-                           placeholder="<?= e($user['username']) ?>">
-                    <p class="form-hint">Leave blank to use your username.</p>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="bio">Biography</label>
-                    <textarea id="bio" name="bio" class="form-textarea" maxlength="500"
-                              placeholder="Tell people what they are looking at."><?= e($profile['bio'] ?? '') ?></textarea>
-                    <p class="form-hint">Plain text, up to 500 characters. Line breaks are kept.</p>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="pronouns">Pronouns</label>
-                        <input type="text" id="pronouns" name="pronouns" class="form-input"
-                               maxlength="32" value="<?= e($profile['pronouns'] ?? '') ?>" placeholder="they/them">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="location">Location</label>
-                        <input type="text" id="location" name="location" class="form-input"
-                               maxlength="100" value="<?= e($profile['location'] ?? '') ?>" placeholder="The internet">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="website">Website</label>
-                    <input type="url" id="website" name="website" class="form-input"
-                           maxlength="255" value="<?= e($profile['website'] ?? '') ?>" placeholder="https://example.com">
-                    <p class="form-hint">Shown next to your location on your public page.</p>
-                </div>
-
-                <hr>
-
-                <div class="form-group">
-                    <label class="form-check">
-                        <input type="checkbox" name="is_public" value="1" <?= ($profile['is_public'] ?? 1) ? 'checked' : '' ?>>
-                        <span class="form-check-text">
-                            Public profile
-                            <small>When off, only you can open your page. Nobody else can view it.</small>
-                        </span>
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-check">
-                        <input type="checkbox" name="show_in_discover" value="1" <?= ($profile['show_in_discover'] ?? 1) ? 'checked' : '' ?>>
-                        <span class="form-check-text">
-                            List me on Discover
-                            <small>Your page stays reachable by direct link either way.</small>
-                        </span>
-                    </label>
-                </div>
-
-                <button type="submit" class="btn btn-primary">Save profile</button>
-            </form>
-        </div>
-    </div>
+    </section>
 </div>
 <?php $content = ob_get_clean(); require BASE_PATH . '/resources/views/layouts/main.php';

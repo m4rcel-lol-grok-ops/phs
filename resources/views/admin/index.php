@@ -1,80 +1,95 @@
 <?php ob_start(); ?>
-<section class="section-tight">
-    <div class="container">
-        <div class="dash-header">
-            <div>
-                <h1>Admin</h1>
-                <p>Everything happening on this instance.</p>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <?php require BASE_PATH . '/resources/views/admin/_nav.php'; ?>
+    </aside>
+    <section class="dashboard-content">
+        <h1 class="mb-4">Admin Overview</h1>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <div class="card text-center">
+                <h3 style="font-size: 2rem; color: var(--accent);"><?= e(format_number($stats['users'] ?? 0)) ?></h3>
+                <div class="text-muted">Total Users</div>
+            </div>
+            <div class="card text-center">
+                <h3 style="font-size: 2rem; color: var(--accent);"><?= e(format_number($stats['links'] ?? 0)) ?></h3>
+                <div class="text-muted">Total Links</div>
+            </div>
+            <div class="card text-center">
+                <h3 style="font-size: 2rem; color: #ef4444;"><?= e(format_number($stats['reports'] ?? 0)) ?></h3>
+                <div class="text-muted">Pending Reports</div>
             </div>
         </div>
 
-        <?php require __DIR__ . '/_nav.php'; ?>
-
-        <?php if ($stats['reports'] > 0): ?>
-            <div class="alert alert-info mb-3" role="status">
-                <?= (int)$stats['reports'] ?> report<?= $stats['reports'] === 1 ? '' : 's' ?> waiting for review.
-                <a href="/admin/reports">Open the queue</a>.
+        <div class="card mb-4">
+            <h2>Recent Users</h2>
+            <div class="table-wrap mt-4">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>User</th>
+                            <th>Email</th>
+                            <th>Joined</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($recentUsers)): ?>
+                            <tr><td colspan="4" class="text-center text-muted">No users found.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($recentUsers as $user): ?>
+                                <tr>
+                                    <td>
+                                        <strong><?= e($user['username']) ?></strong>
+                                        <?php if ($user['role'] === 'admin'): ?><span class="badge" style="background:#3b82f6;color:#fff;padding:2px 6px;border-radius:4px;font-size:0.8rem;margin-left:4px;">Admin</span><?php endif; ?>
+                                    </td>
+                                    <td><?= e($user['email']) ?></td>
+                                    <td><?= e(time_ago($user['created_at'])) ?></td>
+                                    <td>
+                                        <?php if ($user['is_disabled']): ?>
+                                            <span style="color:#ef4444;">Disabled</span>
+                                        <?php else: ?>
+                                            <span style="color:#10b981;">Active</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-        <?php endif; ?>
-
-        <div class="stat-grid">
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['users'])) ?></div><div class="stat-label">Users</div></div>
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['new_week'])) ?></div><div class="stat-label">New this week</div></div>
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['links'])) ?></div><div class="stat-label">Links</div></div>
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['views'])) ?></div><div class="stat-label">Profile views</div></div>
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['clicks'])) ?></div><div class="stat-label">Link clicks</div></div>
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['reports'])) ?></div><div class="stat-label">Pending reports</div></div>
-            <div class="stat-card"><div class="stat-value"><?= e(format_number($stats['disabled'])) ?></div><div class="stat-label">Disabled users</div></div>
+            <div class="mt-4"><a href="<?= e(url('/admin/users')) ?>" class="btn">View all users</a></div>
         </div>
 
-        <div class="form-row" style="gap:1.25rem">
-            <div class="card">
-                <div class="card-head">
-                    <h3>Newest users</h3>
-                    <a href="/admin/users" class="btn btn-ghost btn-xs">All users →</a>
-                </div>
-                <?php if (empty($recentUsers)): ?>
-                    <p class="text-muted text-sm">No users yet.</p>
-                <?php else: ?>
-                    <div class="link-list">
-                        <?php foreach ($recentUsers as $u): ?>
-                            <div class="link-item">
-                                <span class="table-avatar" aria-hidden="true"><?= e(mb_strtoupper(mb_substr((string)$u['username'], 0, 1))) ?></span>
-                                <div class="link-body">
-                                    <strong><a href="/<?= e($u['username']) ?>" target="_blank" rel="noopener">@<?= e($u['username']) ?></a></strong>
-                                    <span class="link-url"><?= e(time_ago((string)$u['created_at'])) ?></span>
-                                </div>
-                                <?php if ($u['is_disabled']): ?>
-                                    <span class="badge badge-danger">Disabled</span>
-                                <?php endif; ?>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-            </div>
-
-            <div class="card">
-                <div class="card-head"><h3>Recent admin actions</h3></div>
-                <?php if (empty($recentActions)): ?>
-                    <p class="text-muted text-sm">Nothing logged yet.</p>
-                <?php else: ?>
-                    <div class="link-list">
-                        <?php foreach ($recentActions as $log): ?>
-                            <div class="link-item">
-                                <div class="link-body">
-                                    <strong><?= e(str_replace('_', ' ', (string)$log['action'])) ?></strong>
-                                    <span class="link-url">
-                                        by @<?= e($log['admin_username'] ?? 'deleted user') ?>
-                                        <?= $log['details'] ? '· ' . e((string)$log['details']) : '' ?>
-                                    </span>
-                                </div>
-                                <span class="text-dim text-xs"><?= e(time_ago((string)$log['created_at'])) ?></span>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
+        <div class="card">
+            <h2>Recent Admin Actions</h2>
+            <div class="table-wrap mt-4">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Action</th>
+                            <th>User</th>
+                            <th>Target</th>
+                            <th>Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($recentActions)): ?>
+                            <tr><td colspan="4" class="text-center text-muted">No actions logged.</td></tr>
+                        <?php else: ?>
+                            <?php foreach ($recentActions as $action): ?>
+                                <tr>
+                                    <td><?= e($action['action']) ?></td>
+                                    <td><?= e($action['admin_username']) ?></td>
+                                    <td><?= e($action['target_username'] ?? 'N/A') ?></td>
+                                    <td><?= e(time_ago($action['created_at'])) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
-    </div>
-</section>
+    </section>
+</div>
 <?php $content = ob_get_clean(); require BASE_PATH . '/resources/views/layouts/main.php';

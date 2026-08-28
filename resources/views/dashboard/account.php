@@ -1,104 +1,99 @@
 <?php ob_start(); ?>
-<div class="dash-layout">
-    <?php require __DIR__ . '/_sidebar.php'; ?>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <?php require BASE_PATH . '/resources/views/dashboard/_sidebar.php'; ?>
+    </aside>
+    <section class="dashboard-content">
+        <h1 class="mb-4">Account Settings</h1>
+        
+        <div class="card mb-4">
+            <h2>Profile Visibility</h2>
+            <form action="<?= e(url('/dashboard/account')) ?>" method="POST">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="visibility">
+                
+                <div class="input-group" style="flex-direction: row; align-items: center;">
+                    <input type="checkbox" id="is_public" name="is_public" value="1" <?= $profile['is_public'] ? 'checked' : '' ?>>
+                    <label for="is_public">Profile is public</label>
+                </div>
+                <div class="input-group" style="flex-direction: row; align-items: center;">
+                    <input type="checkbox" id="show_in_discover" name="show_in_discover" value="1" <?= $profile['show_in_discover'] ? 'checked' : '' ?>>
+                    <label for="show_in_discover">Show in Discovery directory</label>
+                </div>
 
-    <div class="dash-content">
-        <div class="dash-header">
-            <div>
-                <h1>Account</h1>
-                <p>Sign-in details and the big red button.</p>
-            </div>
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">Update Visibility</button>
+                </div>
+            </form>
         </div>
 
-        <div class="card mb-3">
-            <div class="card-head"><h3>Account details</h3></div>
-            <table>
-                <tbody>
-                    <tr><td class="text-muted">Username</td><td><strong>@<?= e($user['username']) ?></strong></td></tr>
-                    <tr><td class="text-muted">Role</td><td>
-                        <span class="badge <?= $user['role'] === 'admin' ? 'badge-admin' : 'badge-off' ?>"><?= e(ucfirst($user['role'])) ?></span>
-                    </td></tr>
-                    <tr><td class="text-muted">Verified</td><td>
-                        <span class="badge <?= $user['is_verified'] ? 'badge-on' : 'badge-off' ?>">
-                            <?= $user['is_verified'] ? 'Verified' : 'Not verified' ?>
-                        </span>
-                    </td></tr>
-                    <tr><td class="text-muted">Member since</td><td><?= e(date('j F Y', strtotime((string)$user['created_at']) ?: time())) ?></td></tr>
-                </tbody>
-            </table>
-            <p class="form-hint mt-2">Usernames cannot be changed — your public link depends on it.</p>
-        </div>
-
-        <div class="card mb-3">
-            <div class="card-head"><h3>Change email</h3></div>
-            <form method="post" action="/dashboard/account">
+        <div class="card mb-4">
+            <h2>Update Email</h2>
+            <form action="<?= e(url('/dashboard/account')) ?>" method="POST">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="email">
-                <div class="form-group">
-                    <label class="form-label" for="email">Email address</label>
-                    <input type="email" id="email" name="email" class="form-input"
-                           required value="<?= e($user['email']) ?>" autocomplete="email">
+                
+                <div class="input-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" class="input" value="<?= old('email') ?? e($user['email']) ?>" required>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="email_password">Confirm with your password</label>
-                    <input type="password" id="email_password" name="current_password" class="form-input"
-                           required autocomplete="current-password">
+                <div class="input-group">
+                    <label for="email_current_password">Confirm with your password</label>
+                    <input type="password" id="email_current_password" name="current_password" class="input" required autocomplete="current-password">
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Update email</button>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn">Update Email</button>
+                </div>
             </form>
         </div>
 
-        <div class="card mb-3">
-            <div class="card-head"><h3>Change password</h3></div>
-            <form method="post" action="/dashboard/account">
+        <div class="card mb-4">
+            <h2>Update Password</h2>
+            <form action="<?= e(url('/dashboard/account')) ?>" method="POST">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="password">
-                <div class="form-group">
-                    <label class="form-label" for="current_password">Current password</label>
-                    <input type="password" id="current_password" name="current_password" class="form-input"
-                           required autocomplete="current-password">
+                
+                <div class="input-group">
+                    <label for="current_password">Current Password</label>
+                    <input type="password" id="current_password" name="current_password" class="input" required>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="new_password">New password</label>
-                        <input type="password" id="new_password" name="new_password" class="form-input"
-                               required minlength="8" autocomplete="new-password">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="new_password_confirm">Confirm new password</label>
-                        <input type="password" id="new_password_confirm" name="new_password_confirm" class="form-input"
-                               required minlength="8" autocomplete="new-password">
-                    </div>
+                <div class="input-group">
+                    <label for="new_password">New Password</label>
+                    <input type="password" id="new_password" name="new_password" class="input" required minlength="8">
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm">Change password</button>
+                <div class="input-group">
+                    <label for="new_password_confirm">Confirm New Password</label>
+                    <input type="password" id="new_password_confirm" name="new_password_confirm" class="input" required minlength="8">
+                </div>
+
+                <div class="mt-4">
+                    <button type="submit" class="btn">Update Password</button>
+                </div>
             </form>
         </div>
 
-        <div class="card card-danger">
-            <div class="card-head"><h3>Delete account</h3></div>
-            <div class="notice notice-danger mb-2">
-                <strong>This cannot be undone.</strong> Your profile, links, uploads, and all
-                statistics are permanently removed, and your username becomes available again.
-            </div>
-            <form method="post" action="/dashboard/account"
-                  data-confirm="Permanently delete your account and everything on it?">
+        <div class="card" style="border-color: #ef4444;">
+            <h2 style="color: #ef4444;">Danger Zone</h2>
+            <p class="mb-4">Once you delete your account, there is no going back. Please be certain.</p>
+            <form action="<?= e(url('/dashboard/account')) ?>" method="POST" data-confirm="Are you absolutely sure you want to delete your account? This action cannot be undone.">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="delete">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label class="form-label" for="confirm_delete">Type <code><?= e($user['username']) ?></code> to confirm</label>
-                        <input type="text" id="confirm_delete" name="confirm_delete" class="form-input"
-                               required placeholder="<?= e($user['username']) ?>" autocomplete="off">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="delete_password">Your password</label>
-                        <input type="password" id="delete_password" name="current_password" class="form-input"
-                               required autocomplete="current-password">
-                    </div>
+
+                <div class="input-group">
+                    <label for="confirm_delete">Type <code><?= e($user['username']) ?></code> to confirm</label>
+                    <input type="text" id="confirm_delete" name="confirm_delete" class="input"
+                           placeholder="<?= e($user['username']) ?>" required autocomplete="off">
                 </div>
-                <button type="submit" class="btn btn-danger btn-sm">Delete my account forever</button>
+                <div class="input-group">
+                    <label for="delete_current_password">Your password</label>
+                    <input type="password" id="delete_current_password" name="current_password" class="input"
+                           required autocomplete="current-password">
+                </div>
+
+                <button type="submit" class="btn btn-danger">Delete Account</button>
             </form>
         </div>
-    </div>
+    </section>
 </div>
 <?php $content = ob_get_clean(); require BASE_PATH . '/resources/views/layouts/main.php';

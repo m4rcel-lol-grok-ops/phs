@@ -1,96 +1,69 @@
-<?php
-ob_start();
-$tabs = ['pending' => 'Pending', 'reviewed' => 'Reviewed', 'actioned' => 'Actioned', 'dismissed' => 'Dismissed'];
-?>
-<section class="section-tight">
-    <div class="container">
-        <div class="dash-header">
-            <div>
-                <h1>Reports</h1>
-                <p>User-submitted reports, newest first.</p>
-            </div>
-        </div>
-
-        <?php require __DIR__ . '/_nav.php'; ?>
-
-        <div class="toolbar">
-            <div class="filter-tabs">
-                <?php foreach ($tabs as $key => $label): ?>
-                    <a href="/admin/reports?status=<?= e($key) ?>" class="<?= $status === $key ? 'active' : '' ?>">
-                        <?= e($label) ?>
-                        <?php if (!empty($counts[$key])): ?><span class="count">(<?= (int)$counts[$key] ?>)</span><?php endif; ?>
-                    </a>
-                <?php endforeach; ?>
-            </div>
+<?php ob_start(); ?>
+<div class="dashboard-layout">
+    <aside class="sidebar">
+        <?php require BASE_PATH . '/resources/views/admin/_nav.php'; ?>
+    </aside>
+    <section class="dashboard-content">
+        <h1 class="mb-4">Reports</h1>
+        
+        <div class="flex gap-4 mb-4" style="flex-wrap: wrap;">
+            <a href="<?= e(url('/admin/reports?status=pending')) ?>" class="btn <?= ($status ?? 'pending') === 'pending' ? 'btn-primary' : '' ?>">Pending (<?= e($counts['pending'] ?? 0) ?>)</a>
+            <a href="<?= e(url('/admin/reports?status=reviewed')) ?>" class="btn <?= ($status ?? '') === 'reviewed' ? 'btn-primary' : '' ?>">Reviewed (<?= e($counts['reviewed'] ?? 0) ?>)</a>
+            <a href="<?= e(url('/admin/reports?status=dismissed')) ?>" class="btn <?= ($status ?? '') === 'dismissed' ? 'btn-primary' : '' ?>">Dismissed (<?= e($counts['dismissed'] ?? 0) ?>)</a>
         </div>
 
         <?php if (empty($reports)): ?>
             <div class="empty-state">
-                <div class="icon" aria-hidden="true">🛡️</div>
-                <h3>Nothing <?= e($status) ?></h3>
-                <p>
-                    <?= $status === 'pending'
-                        ? 'The moderation queue is empty. Enjoy it while it lasts.'
-                        : 'No reports have this status yet.' ?>
-                </p>
+                <h3>No reports</h3>
+                <p>There are no reports in this category.</p>
             </div>
         <?php else: ?>
-            <?php foreach ($reports as $r): ?>
-                <div class="card mb-2">
-                    <div class="card-head">
-                        <div>
-                            <h3>
-                                <span class="badge badge-off">#<?= (int)$r['id'] ?></span>
-                                <?= e(ucfirst((string)$r['report_type'])) ?> report on
-                                <a href="/<?= e($r['reported_username']) ?>" target="_blank" rel="noopener">@<?= e($r['reported_username']) ?></a>
-                            </h3>
-                            <p class="text-dim text-xs mt-1">
-                                Reported by <?= $r['reporter_username'] ? '@' . e($r['reporter_username']) : 'an anonymous visitor' ?>
-                                · <?= e(time_ago((string)$r['created_at'])) ?>
-                                <?php if (!empty($r['reviewer_username'])): ?>
-                                    · reviewed by @<?= e($r['reviewer_username']) ?>
-                                <?php endif; ?>
-                            </p>
+            <div style="display:flex; flex-direction:column; gap:1rem;">
+                <?php foreach ($reports as $report): ?>
+                    <div class="card" style="border-left: 4px solid <?= $report['status'] === 'pending' ? '#ef4444' : 'var(--border)' ?>;">
+                        <div class="flex justify-between items-center mb-2">
+                            <strong>Reported User: <a href="<?= e(url('/' . $report['reported_username'])) ?>" target="_blank">@<?= e($report['reported_username']) ?></a></strong>
+                            <span class="text-muted"><?= e(time_ago($report['created_at'])) ?></span>
                         </div>
-                        <span class="badge <?= $r['status'] === 'pending' ? 'badge-admin' : 'badge-off' ?>">
-                            <?= e(ucfirst((string)$r['status'])) ?>
-                        </span>
+                        <div class="mb-2">
+                            <span class="badge" style="background:var(--bg-elevated);padding:2px 6px;border-radius:4px;font-size:0.8rem;"><?= e(strtoupper($report['report_type'])) ?></span>
+                        </div>
+                        <div class="mb-4" style="background: var(--bg); padding: 1rem; border-radius: var(--radius-sm);">
+                            <?= e($report['reason']) ?>
+                        </div>
+                        
+                        <?php if ($report['status'] === 'pending'): ?>
+                            <form action="<?= e(url('/admin/reports')) ?>" method="POST">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="report_id" value="<?= e($report['id']) ?>">
+                                <input type="hidden" name="disable_user" value="1">
+                                <div class="input-group">
+                                    <label>Action to take</label>
+                                    <select name="action" class="select">
+                                        <option value="review">Mark as Reviewed (No action)</option>
+                                        <option value="dismiss">Dismiss (Invalid report)</option>
+                                        <option value="action">Take Action (Disable user)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Internal Notes (Optional)</label>
+                                    <input type="text" name="notes" class="input">
+                                </div>
+                                <button type="submit" class="btn btn-primary">Process Report</button>
+                            </form>
+                        <?php else: ?>
+                            <div class="text-muted">
+                                Status: <strong><?= e(ucfirst($report['status'])) ?></strong><br>
+                                Processed by: <?= e($report['reviewer_username'] ?? 'Unknown') ?>
+                                <?php if ($report['admin_notes']): ?>
+                                    <br>Notes: <?= e($report['admin_notes']) ?>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
-
-                    <blockquote class="notice mb-2"><?= nl2br(e((string)$r['reason'])) ?></blockquote>
-
-                    <?php if (!empty($r['admin_notes'])): ?>
-                        <p class="text-muted text-sm mb-2"><strong>Notes:</strong> <?= e((string)$r['admin_notes']) ?></p>
-                    <?php endif; ?>
-
-                    <?php if ($r['status'] === 'pending'): ?>
-                        <form method="post" action="/admin/reports">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="report_id" value="<?= (int)$r['id'] ?>">
-                            <div class="form-group">
-                                <label class="form-label" for="notes-<?= (int)$r['id'] ?>">Moderator notes <span class="text-dim">(optional)</span></label>
-                                <input type="text" id="notes-<?= (int)$r['id'] ?>" name="notes" class="form-input"
-                                       maxlength="2000" placeholder="What did you decide, and why?">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-check">
-                                    <input type="checkbox" name="disable_user" value="1">
-                                    <span class="form-check-text">
-                                        Also disable @<?= e($r['reported_username']) ?>
-                                        <small>Only applies when you choose “Take action”. Administrators are never disabled this way.</small>
-                                    </span>
-                                </label>
-                            </div>
-                            <div class="flex gap-1 flex-wrap">
-                                <button name="action" value="action" class="btn btn-primary btn-sm">Take action</button>
-                                <button name="action" value="review" class="btn btn-secondary btn-sm">Mark reviewed</button>
-                                <button name="action" value="dismiss" class="btn btn-ghost btn-sm">Dismiss</button>
-                            </div>
-                        </form>
-                    <?php endif; ?>
-                </div>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
         <?php endif; ?>
-    </div>
-</section>
+    </section>
+</div>
 <?php $content = ob_get_clean(); require BASE_PATH . '/resources/views/layouts/main.php';
