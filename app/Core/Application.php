@@ -45,6 +45,13 @@ class Application
     private function configureSession(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
+            $sessionPath = BASE_PATH . '/storage/sessions';
+            if (!is_dir($sessionPath)) {
+                @mkdir($sessionPath, 0775, true);
+            }
+            if (is_dir($sessionPath) && is_writable($sessionPath)) {
+                session_save_path($sessionPath);
+            }
             $secure = $this->isHttps();
             session_set_cookie_params([
                 'lifetime' => (int)(getenv('SESSION_LIFETIME') ?: 7200),
@@ -72,6 +79,7 @@ class Application
 
     private function registerRoutes(): void
     {
+        $app = $this; // routes/web.php expects $app
         require BASE_PATH . '/routes/web.php';
     }
 

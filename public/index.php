@@ -4,12 +4,6 @@ declare(strict_types=1);
 define('BASE_PATH', dirname(__DIR__));
 define('START_TIME', microtime(true));
 
-// Error reporting based on env
-$errorReporting = getenv('APP_DEBUG') === 'true' ? E_ALL : 0;
-error_reporting($errorReporting);
-ini_set('display_errors', getenv('APP_DEBUG') === 'true' ? '1' : '0');
-
-// Autoload
 spl_autoload_register(function (string $class): void {
     $prefix = 'App\\';
     $baseDir = BASE_PATH . '/app/';
@@ -24,19 +18,49 @@ spl_autoload_register(function (string $class): void {
     }
 });
 
-// Load helpers
 require BASE_PATH . '/app/Helpers/helpers.php';
 
-// Bootstrap
+// Load .env early (compose env_file already sets vars; this helps non-Docker)
+$envFile = BASE_PATH . '/.env';
+if (file_exists($envFile)) {
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+            continue;
+        }
+        [$key, $value] = explode('=', $line, 2);
+        $key = trim($key);
+        $value = trim($value, " \t\"'");
+        if (getenv($key) === false) {
+            putenv("$key=$value");
+            $_ENV[$key] = $value;
+        }
+    }
+}
+
+$debug = in_array(strtolower((string)getenv('APP_DEBUG')), ['true', '1', 'yes'], true);
+error_reporting(E_ALL);
+ini_set('display_errors', $debug ? '1' : '0');
+ini_set('log_errors', '1');
+$logDir = BASE_PATH . '/storage/logs';
+if (!is_dir($logDir)) {
+    @mkdir($logDir, 0775, true);
+}
+ini_set('error_log', $logDir . '/php-error.log');
+
 try {
     $app = new App\Core\Application();
     $app->run();
 } catch (Throwable $e) {
-    if (getenv('APP_DEBUG') === 'true') {
-        http_response_code(500);
-        echo '<h1>Error</h1><pre>' . htmlspecialchars($e->getMessage() . "\n" . $e->getTraceAsString()) . '</pre>';
-    } else {
-        http_response_code(500);
+    $msg = $e->getMessage() . "\n" . $e->getTraceAsString();
+    @file_put_contents($logDir . '/app-error.log', date('c') . ' ' . $msg . "\n\n", FILE_APPEND);
+    http_response_code(500);
+    if ($debug) {
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "Error\n\n" . $msg;
+    } elseif (file_exists(BASE_PATH . '/resources/views/errors/500.php')) {
         require BASE_PATH . '/resources/views/errors/500.php';
+    } else {
+        echo '500 — check storage/logs/app-error.log';
     }
 }
