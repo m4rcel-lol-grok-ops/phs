@@ -1,0 +1,18 @@
+.git
+.gitignore
+.env
+*.md
+!README.md
+
+# Build output and dependencies are produced inside the image.
+frontend/node_modules
+frontend/dist
+frontend/.angular
+backend/internal/web/dist
+
+# Local data must never leak into an image.
+data
+*.db
+*.db-wal
+*.db-shm
+.DS_Store

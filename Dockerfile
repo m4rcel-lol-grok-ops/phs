@@ -1,40 +1,60 @@
-FROM php:8.3-apache
+# syntax=docker/dockerfile:1
 
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libzip-dev \
-    unzip \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd pdo pdo_mysql zip \
-    && a2enmod rewrite headers \
-    && rm -rf /var/lib/apt/lists/*
+# ---------------------------------------------------------------------------
+# Stage 1 — build the Angular bundle.
+# ---------------------------------------------------------------------------
+FROM node:24-alpine AS frontend
 
-# Security: disable PHP execution in uploads
-RUN echo '<Directory /var/www/html/uploads>\n\
-    php_flag engine off\n\
-    Options -ExecCGI\n\
-    AllowOverride None\n\
-</Directory>' > /etc/apache2/conf-available/uploads-security.conf \
-    && a2enconf uploads-security
+WORKDIR /app
 
-COPY --chown=www-data:www-data . /var/www/html/
+# Dependencies first so the layer is reused whenever only sources change.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-# Public is document root
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
-    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+COPY frontend/ ./
+RUN npm run build
 
-# Allow .htaccess overrides
-RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
 
-WORKDIR /var/www/html
+# ---------------------------------------------------------------------------
+# Stage 2 — compile the Go binary with the frontend embedded in it.
+# ---------------------------------------------------------------------------
+FROM golang:1.26-alpine AS backend
 
-# Entrypoint for init
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+WORKDIR /src
 
-EXPOSE 80
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["apache2-foreground"]
+COPY backend/go.mod backend/go.sum ./
+RUN go mod download
+
+COPY backend/ ./
+# go:embed picks the bundle up from internal/web/dist.
+COPY --from=frontend /app/dist/frontend/browser ./internal/web/dist
+
+# CGO is off: modernc.org/sqlite is pure Go, so the result is a static binary.
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/phs-server ./cmd/server
+
+# Pre-create the data directory with the runtime uid so a fresh named volume
+# inherits the right ownership.
+RUN mkdir -p /out/data/uploads
+
+
+# ---------------------------------------------------------------------------
+# Stage 3 — runtime: distroless, non-root, ~20 MB total.
+# ---------------------------------------------------------------------------
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=backend /out/phs-server /usr/local/bin/phs-server
+COPY --from=backend --chown=65532:65532 /out/data /data
+
+USER 65532:65532
+WORKDIR /data
+EXPOSE 8080
+
+ENV PHS_ADDR=:8080 \
+    PHS_DB_PATH=/data/phs.db \
+    PHS_UPLOAD_DIR=/data/uploads
+
+# The binary probes itself; the image has no shell or wget.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD ["/usr/local/bin/phs-server", "-healthcheck"]
+
+ENTRYPOINT ["/usr/local/bin/phs-server"]
